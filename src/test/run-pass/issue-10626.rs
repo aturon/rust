@@ -27,14 +27,7 @@ pub fn main () {
         return;
     }
 
-    let config = process::ProcessConfig {
-        program : args[0].as_slice(),
-        args : &["child".to_owned()],
-        stdout: process::Ignored,
-        stderr: process::Ignored,
-        .. process::ProcessConfig::new()
-    };
-
-    let mut p = process::Process::configure(config).unwrap();
-    println!("{}", p.wait());
+    let mut p = process::Command::new(args[0]);
+    p..arg("child").stdout(process::Ignored).stderr(process::Ignored);
+    println!("{}", p.spawn().unwrap().wait());
 }

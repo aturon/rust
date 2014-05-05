@@ -25,7 +25,6 @@ use std::c_str::CString;
 use std::io;
 use std::io::IoError;
 use std::io::net::ip::SocketAddr;
-use std::io::process::ProcessConfig;
 use std::io::signal::Signum;
 use libc::c_int;
 use libc;
@@ -33,7 +32,7 @@ use std::os;
 use std::rt::rtio;
 use std::rt::rtio::{RtioTcpStream, RtioTcpListener, RtioUdpSocket,
                     RtioUnixListener, RtioPipe, RtioFileStream, RtioProcess,
-                    RtioSignal, RtioTTY, CloseBehavior, RtioTimer};
+                    RtioSignal, RtioTTY, CloseBehavior, RtioTimer, ProcessConfig};
 use ai = std::io::net::addrinfo;
 
 // Local re-exports
@@ -247,9 +246,9 @@ impl rtio::IoFactory for IoFactory {
     fn timer_init(&mut self) -> IoResult<~RtioTimer:Send> {
         timer::Timer::new().map(|t| box t as ~RtioTimer:Send)
     }
-    fn spawn(&mut self, config: ProcessConfig)
+    fn spawn(&mut self, cfg: ProcessConfig)
             -> IoResult<(~RtioProcess:Send, ~[Option<~RtioPipe:Send>])> {
-        process::Process::spawn(config).map(|(p, io)| {
+        process::Process::spawn(cfg).map(|(p, io)| {
             (box p as ~RtioProcess:Send,
              io.move_iter().map(|p| p.map(|p| box p as ~RtioPipe:Send)).collect())
         })
