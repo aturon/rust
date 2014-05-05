@@ -408,7 +408,7 @@ fn run_debuginfo_gdb_test(config: &config, props: &TestProps, testfile: &Path) {
 }
 
 fn run_debuginfo_lldb_test(config: &config, props: &TestProps, testfile: &Path) {
-    use std::io::process::{Process, ProcessConfig, ProcessOutput};
+    use std::io::process::{Command, ProcessOutput};
 
     if config.lldb_python_dir.is_none() {
         fatal("Can't run LLDB test because LLDB's python path is not set.".to_owned());
@@ -471,25 +471,13 @@ fn run_debuginfo_lldb_test(config: &config, props: &TestProps, testfile: &Path) 
 
     fn run_lldb(config: &config, test_executable: &Path, debugger_script: &Path) -> ProcRes {
         // Prepare the lldb_batchmode which executes the debugger script
-        let lldb_batchmode_script = "./src/etc/lldb_batchmode.py".to_owned();
-        let test_executable_str = test_executable.as_str().unwrap().to_owned();
-        let debugger_script_str = debugger_script.as_str().unwrap().to_owned();
-        let commandline = format!("python {} {} {}",
-                                  lldb_batchmode_script.as_slice(),
-                                  test_executable_str.as_slice(),
-                                  debugger_script_str.as_slice());
+        let mut cmd = Command::new("python");
+        cmd.arg("./src/etc/lldb_batchmode.py")
+           .arg(test_executable)
+           .arg(debugger_script)
+           .env([("PYTHONPATH", config.lldb_python_dir.clone().unwrap().as_slice())]);
 
-        let args = &[lldb_batchmode_script, test_executable_str, debugger_script_str];
-        let env = &[("PYTHONPATH".to_owned(), config.lldb_python_dir.clone().unwrap())];
-
-        let mut opt_process = Process::configure(ProcessConfig {
-            program: "python",
-            args: args,
-            env: Some(env),
-            .. ProcessConfig::new()
-        });
-
-        let (status, out, err) = match opt_process {
+        let (status, out, err) = match cmd.spawn() {
             Ok(ref mut process) => {
                 let ProcessOutput { status, output, error } = process.wait_with_output();
 
@@ -507,7 +495,7 @@ fn run_debuginfo_lldb_test(config: &config, props: &TestProps, testfile: &Path) 
             status: status,
             stdout: out,
             stderr: err,
-            cmdline: commandline
+            cmdline: format!("{}", cmd)
         };
     }
 }
