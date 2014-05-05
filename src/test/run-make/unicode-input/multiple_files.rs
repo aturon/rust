@@ -12,7 +12,7 @@ extern crate rand;
 use rand::{task_rng, Rng};
 
 use std::{char, os, str};
-use std::io::{File, Process};
+use std::io::{File, Command};
 
 // creates unicode_input_multiple_files_{main,chars}.rs, where the
 // former imports the latter. `_chars` just contains an indentifier
@@ -57,7 +57,8 @@ fn main() {
 
         // rustc is passed to us with --out-dir and -L etc., so we
         // can't exec it directly
-        let result = Process::output("sh", ["-c".to_owned(), rustc + " " + main_file_str]).unwrap();
+        let result = Command::new("sh").arg("-c")
+                             .arg(rustc).arg(main_file_str).output().unwrap();
         let err = str::from_utf8_lossy(result.error.as_slice());
 
         // positive test so that this test will be updated when the

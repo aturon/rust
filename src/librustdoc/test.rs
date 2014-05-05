@@ -153,9 +153,7 @@ fn runtest(test: &str, cratename: &str, libs: HashSet<Path>, should_fail: bool,
     if no_run { return }
 
     // Run the code!
-    let exe = outdir.path().join("rust_out");
-    let out = Process::output(exe.as_str().unwrap(), []);
-    match out {
+    match Command::new(outdir.path().join("rust_out")).output() {
         Err(e) => fail!("couldn't run the test: {}{}", e,
                         if e.kind == io::PermissionDenied {
                             " - maybe your tempdir is mounted with noexec?"
