@@ -21,7 +21,7 @@ use clone::Clone;
 use collections::MutableSeq;
 use io::IoResult;
 use iter::Iterator;
-use slice::ImmutableSlice;
+use slice::Slice;
 use result::{Ok,Err};
 use io::net::addrinfo::get_host_addresses;
 use io::net::ip::SocketAddr;

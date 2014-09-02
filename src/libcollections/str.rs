@@ -59,8 +59,8 @@ use core::fmt;
 use core::cmp;
 use core::iter::AdditiveIterator;
 use core::mem;
-use core::prelude::{Char, Clone, Collection, Eq, Equiv, ImmutableSlice};
-use core::prelude::{Iterator, MutableSlice, None, Option, Ord, Ordering};
+use core::prelude::{Char, Clone, Collection, Eq, Equiv, AsSlice};
+use core::prelude::{Iterator, None, Option, Ord, Ordering};
 use core::prelude::{PartialEq, PartialOrd, Result, Slice, Some, Tuple2};
 use core::prelude::{range};
 

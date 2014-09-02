@@ -14,7 +14,7 @@
 
 fn bsearch_range_table(c: char, r: &'static [(char,char)]) -> bool {
     use core::cmp::{Equal, Less, Greater};
-    use core::slice::ImmutableSlice;
+    use core::slice::Slice;
     r.binary_search(|&(lo,hi)| {
         if lo <= c && c <= hi { Equal }
         else if hi < c { Less }
@@ -6228,7 +6228,7 @@ pub mod normalization {
 
     fn bsearch_range_value_table(c: char, r: &'static [(char, char, u8)]) -> u8 {
         use core::cmp::{Equal, Less, Greater};
-        use core::slice::ImmutableSlice;
+        use core::slice::Slice;
         use core::slice;
         match r.binary_search(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -6353,7 +6353,7 @@ pub mod normalization {
 
 pub mod conversions {
     use core::cmp::{Equal, Less, Greater};
-    use core::slice::ImmutableSlice;
+    use core::slice::Slice;
     use core::tuple::Tuple2;
     use core::option::{Option, Some, None};
     use core::slice;
@@ -6918,7 +6918,7 @@ pub mod conversions {
 
 pub mod charwidth {
     use core::option::{Option, Some, None};
-    use core::slice::ImmutableSlice;
+    use core::slice::Slice;
     use core::slice;
 
     fn bsearch_range_value_table(c: char, is_cjk: bool, r: &'static [(char, char, u8, u8)]) -> u8 {
@@ -7116,7 +7116,7 @@ pub mod charwidth {
 }
 
 pub mod grapheme {
-    use core::slice::ImmutableSlice;
+    use core::slice::Slice;
     use core::slice;
 
     #[allow(non_camel_case_types)]

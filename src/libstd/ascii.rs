@@ -19,7 +19,7 @@ use fmt;
 use iter::Iterator;
 use mem;
 use option::{Option, Some, None};
-use slice::{ImmutableSlice, MutableSlice, Slice};
+use slice::{Slice, AsSlice};
 use str::{Str, StrSlice};
 use str;
 use string::String;

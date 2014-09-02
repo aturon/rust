@@ -71,11 +71,11 @@ use collections::hash;
 use core::fmt;
 use core::kinds::marker;
 use core::mem;
-use core::prelude::{Clone, Collection, Drop, Eq, ImmutableSlice, Iterator};
-use core::prelude::{MutableSlice, None, Option, Ordering, PartialEq};
+use core::prelude::{Clone, Collection, Drop, Eq, Slice, Iterator};
+use core::prelude::{None, Option, Ordering, PartialEq};
 use core::prelude::{PartialOrd, RawPtr, Some, StrSlice, range};
 use core::ptr;
-use core::raw::Slice;
+use core::raw::Slice as RawSlice;
 use core::slice;
 use core::str;
 use libc;
@@ -230,7 +230,7 @@ impl CString {
     #[inline]
     pub fn as_bytes<'a>(&'a self) -> &'a [u8] {
         unsafe {
-            mem::transmute(Slice { data: self.buf, len: self.len() + 1 })
+            mem::transmute(RawSlice { data: self.buf, len: self.len() + 1 })
         }
     }
 
@@ -239,7 +239,7 @@ impl CString {
     #[inline]
     pub fn as_bytes_no_nul<'a>(&'a self) -> &'a [u8] {
         unsafe {
-            mem::transmute(Slice { data: self.buf, len: self.len() })
+            mem::transmute(RawSlice { data: self.buf, len: self.len() })
         }
     }
 

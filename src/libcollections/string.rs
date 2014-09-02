@@ -835,7 +835,7 @@ pub mod raw {
     /// * A raw pointer is dereferenced and transmuted to `&[u8]`;
     /// * The slice is not checked to see whether it contains valid UTF-8.
     pub unsafe fn from_buf_len(buf: *const u8, len: uint) -> String {
-        use slice::CloneableVector;
+        use slice::ToVec;
         let slice: &[u8] = mem::transmute(Slice {
             data: buf,
             len: len,

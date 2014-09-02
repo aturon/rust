@@ -20,7 +20,7 @@ use num::{Float, FPNaN, FPInfinite, ToPrimitive};
 use num;
 use ops::{Add, Sub, Mul, Div, Rem, Neg};
 use option::{None, Option, Some};
-use slice::{ImmutableSlice, MutableSlice};
+use slice::Slice;
 use std::cmp::{PartialOrd, PartialEq};
 use str::StrSlice;
 use string::String;

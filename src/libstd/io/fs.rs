@@ -70,7 +70,7 @@ use path;
 use result::{Err, Ok};
 use rt::rtio::LocalIo;
 use rt::rtio;
-use slice::ImmutableSlice;
+use slice::Slice;
 use string::String;
 use vec::Vec;
 

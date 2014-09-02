@@ -18,11 +18,11 @@ use from_str::FromStr;
 use hash;
 use io::Writer;
 use iter::{DoubleEndedIterator, AdditiveIterator, Extendable, Iterator, Map};
+use kinds::Sized;
 use option::{Option, None, Some};
 use str::Str;
 use str;
-use slice::{CloneableVector, Splits, Slice, VectorVector,
-            ImmutablePartialEqSlice, ImmutableSlice};
+use slice::{Slice, AsSlice, SliceSlice, CloneSliceAllocating, Splits, PartialEqSlice, ToVec};
 use vec::Vec;
 
 use super::{BytesContainer, GenericPath, GenericPathUnsafe};
@@ -367,7 +367,7 @@ impl Path {
 
     /// Returns a normalized byte vector representation of a path, by removing all empty
     /// components, and unnecessary . and .. components.
-    fn normalize<V: Slice<u8>+CloneableVector<u8>>(v: V) -> Vec<u8> {
+    fn normalize<Sized? V: AsSlice<u8>>(v: &V) -> Vec<u8> {
         // borrowck is being very picky
         let val = {
             let is_abs = !v.as_slice().is_empty() && v.as_slice()[0] == SEP_BYTE;
