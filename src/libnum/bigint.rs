@@ -345,7 +345,7 @@ impl Mul<BigUint, BigUint> for BigUint {
         fn cut_at(a: &BigUint, n: uint) -> (BigUint, BigUint) {
             let mid = cmp::min(a.data.len(), n);
             return (BigUint::from_slice(a.data.slice(mid, a.data.len())),
-                    BigUint::from_slice(a.data.slice(0, mid)));
+                    BigUint::from_slice(a.data[0 .. mid]));
         }
 
         #[inline]

@@ -229,12 +229,12 @@ impl<'a> Parser<'a> {
             // we may not consume the character, so clone the iterator
             match self.cur.clone().next() {
                 Some((pos, '}')) | Some((pos, '{')) => {
-                    return self.input.slice(start, pos);
+                    return self.input[start .. pos];
                 }
                 Some(..) => { self.cur.next(); }
                 None => {
                     self.cur.next();
-                    return self.input.slice(start, self.input.len());
+                    return self.input[start .. self.input.len()];
                 }
             }
         }
@@ -274,7 +274,7 @@ impl<'a> Parser<'a> {
             flags: 0,
             precision: CountImplied,
             width: CountImplied,
-            ty: self.input.slice(0, 0),
+            ty: self.input[0 .. 0],
         };
         if !self.consume(':') { return spec }
 
@@ -383,7 +383,7 @@ impl<'a> Parser<'a> {
                 self.cur.next();
                 pos
             }
-            Some(..) | None => { return self.input.slice(0, 0); }
+            Some(..) | None => { return self.input[0 .. 0]; }
         };
         let mut end;
         loop {
@@ -395,7 +395,7 @@ impl<'a> Parser<'a> {
                 None => { end = self.input.len(); break }
             }
         }
-        self.input.slice(start, end)
+        self.input[start .. end]
     }
 
     /// Optionally parses an integer at the current position. This doesn't deal

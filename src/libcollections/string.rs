@@ -26,9 +26,12 @@ use {Mutable, MutableSeq};
 use hash;
 use slice::CloneableVector;
 use str;
-use str::{CharRange, StrAllocating, MaybeOwned, Owned};
+use str::{CharRange, StrAllocating, MaybeOwned, Owned, NotOnBoundary, OutOfBounds};
 use str::Slice as MaybeOwnedSlice; // So many `Slice`s...
 use vec::Vec;
+
+pub use str::StrError as StringError;
+pub use str::StrResult as StringResult;
 
 /// A growable string stored as a UTF-8 encoded buffer.
 #[deriving(Clone, PartialEq, PartialOrd, Eq, Ord)]
@@ -569,21 +572,6 @@ impl String {
         self.vec.push_all(bytes)
     }
 
-    /// Works with the underlying buffer as a byte slice.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let s = String::from_str("hello");
-    /// let b: &[_] = &[104, 101, 108, 108, 111];
-    /// assert_eq!(s.as_bytes(), b);
-    /// ```
-    #[inline]
-    #[stable]
-    pub fn as_bytes<'a>(&'a self) -> &'a [u8] {
-        self.vec.as_slice()
-    }
-
     /// Works with the underlying buffer as a mutable byte slice.
     ///
     /// This is unsafe because it does not check
@@ -609,12 +597,12 @@ impl String {
         self.vec.as_mut_slice()
     }
 
-    /// Shortens a string to the specified length.
+    /// Shortens a string to the specified length (in bytes).
     ///
-    /// # Failure
+    /// If `len` is greater than the strings's current length, this has
+    /// no effect.
     ///
-    /// Fails if `new_len` > current length,
-    /// or if `new_len` is not a character boundary.
+    /// Returns `Err(NotOnBoundary)` if `new_len` is not a character boundary.
     ///
     /// # Example
     ///
@@ -625,9 +613,13 @@ impl String {
     /// ```
     #[inline]
     #[unstable = "the failure conventions for strings are under development"]
-    pub fn truncate(&mut self, new_len: uint) {
-        assert!(self.as_slice().is_char_boundary(new_len));
-        self.vec.truncate(new_len)
+    pub fn truncate(&mut self, new_len: uint) -> StringResult<()> {
+        match self.as_slice().is_char_boundary(new_len) {
+            Ok(false) => return Err(NotOnBoundary),
+            Ok(true) => self.vec.truncate(new_len),
+            Err(_) => {}
+        }
+        Ok(())
     }
 
     /// Appends a byte to this string buffer.
@@ -702,16 +694,13 @@ impl String {
     #[inline]
     #[unstable = "this function was just renamed from pop_char"]
     pub fn pop(&mut self) -> Option<char> {
-        let len = self.len();
-        if len == 0 {
-            return None
+        match self.as_slice().char_range_at_reverse(self.len()) {
+            Err(_) => None,
+            Ok(CharRange {ch, next}) => {
+                unsafe { self.vec.set_len(next) };
+                Some(ch)
+            }
         }
-
-        let CharRange {ch, next} = self.as_slice().char_range_at_reverse(len);
-        unsafe {
-            self.vec.set_len(next);
-        }
-        Some(ch)
     }
 
     /// Removes the first byte from the string buffer and returns it.
@@ -734,51 +723,49 @@ impl String {
     /// ```
     #[deprecated = "call .as_mut_vec().remove(0)"]
     pub unsafe fn shift_byte(&mut self) -> Option<u8> {
-        self.vec.remove(0)
+        self.vec.remove(0).ok()
     }
 
     /// Deprecated, call `remove(0)` instead
     #[deprecated = "call .remove(0) instead"]
     pub fn shift_char(&mut self) -> Option<char> {
-        self.remove(0)
+        self.remove(0).ok()
     }
 
     /// Removes the character from the string buffer at byte position `idx` and
-    /// returns it. Returns `None` if `idx` is out of bounds.
+    /// returns it.
     ///
     /// # Warning
     ///
     /// This is a O(n) operation as it requires copying every element in the
     /// buffer.
     ///
-    /// # Failure
+    /// # Errors
     ///
-    /// If `idx` does not lie on a character boundary, then this function will
-    /// fail.
+    /// Returns `Err(OutOfBounds)` if `idx` is out of bounds.
+    /// Returns `Err(NotOnBoundary)` if `idx` does not lie on a character boundary.
     ///
     /// # Example
     ///
     /// ```
     /// let mut s = String::from_str("foo");
-    /// assert_eq!(s.remove(0), Some('f'));
-    /// assert_eq!(s.remove(1), Some('o'));
-    /// assert_eq!(s.remove(0), Some('o'));
-    /// assert_eq!(s.remove(0), None);
+    /// assert_eq!(s.remove(0), Ok('f'));
+    /// assert_eq!(s.remove(1), Ok('o'));
+    /// assert_eq!(s.remove(0), Ok('o'));
+    /// assert_eq!(s.remove(0), Err(OutOfBounds));
     /// ```
     #[unstable = "the failure semantics of this function and return type \
                   may change"]
-    pub fn remove(&mut self, idx: uint) -> Option<char> {
+    pub fn remove(&mut self, idx: uint) -> StringResult<char> {
         let len = self.len();
-        if idx >= len { return None }
-
-        let CharRange { ch, next } = self.as_slice().char_range_at(idx);
+        let CharRange { ch, next } = try!(self.as_slice().char_range_at(idx));
         unsafe {
             ptr::copy_memory(self.vec.as_mut_ptr().offset(idx as int),
                              self.vec.as_ptr().offset(next as int),
                              len - next);
             self.vec.set_len(len - (next - idx));
         }
-        Some(ch)
+        Ok(ch)
     }
 
     /// Insert a character into the string buffer at byte position `idx`.
@@ -788,15 +775,19 @@ impl String {
     /// This is a O(n) operation as it requires copying every element in the
     /// buffer.
     ///
-    /// # Failure
+    /// # Errors
     ///
-    /// If `idx` does not lie on a character boundary or is out of bounds, then
-    /// this function will fail.
+    /// Returns `Err(OutOfBounds)` if `idx` is out of bounds.
+    /// Returns `Err(NotOnBoundary)` if `idx` does not lie on a character boundary.
     #[unstable = "the failure semantics of this function are uncertain"]
-    pub fn insert(&mut self, idx: uint, ch: char) {
+    pub fn insert(&mut self, idx: uint, ch: char) -> StringResult<()> {
         let len = self.len();
-        assert!(idx <= len);
-        assert!(self.as_slice().is_char_boundary(idx));
+        match self.as_slice().is_char_boundary(idx) {
+            Ok(false) => return Err(NotOnBoundary),
+            Ok(true) => {},
+            Err(_) => return Err(OutOfBounds),
+        }
+
         self.vec.reserve_additional(4);
         let mut bits = [0, ..4];
         let amt = ch.encode_utf8(bits).unwrap();
@@ -810,6 +801,7 @@ impl String {
                              amt);
             self.vec.set_len(len + amt);
         }
+        Ok(())
     }
 
     /// Views the string buffer as a mutable sequence of bytes.
@@ -970,6 +962,14 @@ impl ops::Slice<uint, str> for String {
     #[inline]
     fn slice_or_fail<'a>(&'a self, from: &uint, to: &uint) -> &'a str {
         self[][*from..*to]
+    }
+}
+
+#[experimental = "waiting on Deref stability"]
+impl Deref<str> for String {
+    #[inline]
+    fn deref(&self) -> &str {
+        self.as_slice()
     }
 }
 

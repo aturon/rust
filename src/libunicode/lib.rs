@@ -30,6 +30,9 @@
        html_playground_url = "http://play.rust-lang.org/")]
 #![no_std]
 
+#![allow(unknown_features)]
+#![feature(slicing_syntax)]
+
 extern crate core;
 
 // regex module

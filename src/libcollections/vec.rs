@@ -28,7 +28,10 @@ use core::uint;
 
 use {Mutable, MutableSeq};
 use slice::{MutableOrdSlice, MutableSliceAllocating, CloneableVector};
-use slice::{Items, MutItems};
+use slice::{Items, MutItems, OutOfBounds};
+
+pub use slice::SliceError as VecError;
+pub use slice::SliceResult as VecResult;
 
 /// An owned, growable vector.
 ///
@@ -448,7 +451,7 @@ impl<T> Index<uint,T> for Vec<T> {
     #[inline]
     #[allow(deprecated)] // allow use of get
     fn index<'a>(&'a self, index: &uint) -> &'a T {
-        self.get(*index)
+        self.get(*index).unwrap()
     }
 }
 
@@ -457,6 +460,24 @@ impl<T> Index<uint,T> for Vec<T> {
     #[inline]
     fn index_mut<'a>(&'a mut self, index: &uint) -> &'a mut T {
         self.get_mut(*index)
+    }
+}*/
+
+#[experimental = "waiting on Deref stability"]
+impl<T> Deref<[T]> for Vec<T> {
+    #[inline]
+    fn deref(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+
+// FIXME(#12825)
+/*
+#[experimental = "waiting on DerefMut stability"]
+impl<T> DerefMut<[T]> for Vec<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut [T] {
+        self.as_mut_slice()
     }
 }*/
 
@@ -868,26 +889,6 @@ impl<T> Vec<T> {
         self.len = len;
     }
 
-    /// Returns a reference to the value at index `index`.
-    ///
-    /// # Failure
-    ///
-    /// Fails if `index` is out of bounds
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// #![allow(deprecated)]
-    ///
-    /// let vec = vec![1i, 2, 3];
-    /// assert!(vec.get(1) == &2);
-    /// ```
-    #[deprecated="prefer using indexing, e.g., vec[0]"]
-    #[inline]
-    pub fn get<'a>(&'a self, index: uint) -> &'a T {
-        &self.as_slice()[index]
-    }
-
     /// Returns a mutable reference to the value at index `index`.
     ///
     /// # Failure
@@ -902,25 +903,9 @@ impl<T> Vec<T> {
     /// assert_eq!(vec, vec![1i, 4, 3]);
     /// ```
     #[inline]
-    #[unstable = "this is likely to be moved to actual indexing"]
+    #[unstable = "awaiting final collections conventions"]
     pub fn get_mut<'a>(&'a mut self, index: uint) -> &'a mut T {
-        &mut self.as_mut_slice()[index]
-    }
-
-    /// Returns an iterator over references to the elements of the vector in
-    /// order.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let vec = vec![1i, 2, 3];
-    /// for num in vec.iter() {
-    ///     println!("{}", *num);
-    /// }
-    /// ```
-    #[inline]
-    pub fn iter<'a>(&'a self) -> Items<'a,T> {
-        self.as_slice().iter()
+        &mut self[mut][index]
     }
 
     /// Deprecated: use `iter_mut`.
@@ -966,78 +951,10 @@ impl<T> Vec<T> {
         self.as_mut_slice().sort_by(compare)
     }
 
-    /// Returns a slice of self spanning the interval [`start`, `end`).
-    ///
-    /// # Failure
-    ///
-    /// Fails when the slice (or part of it) is outside the bounds of self, or when
-    /// `start` > `end`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let vec = vec![1i, 2, 3, 4];
-    /// assert!(vec[0..2] == [1, 2]);
-    /// ```
-    #[inline]
-    pub fn slice<'a>(&'a self, start: uint, end: uint) -> &'a [T] {
-        self[start..end]
-    }
-
-    /// Returns a slice containing all but the first element of the vector.
-    ///
-    /// # Failure
-    ///
-    /// Fails when the vector is empty.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let vec = vec![1i, 2, 3];
-    /// assert!(vec.tail() == [2, 3]);
-    /// ```
-    #[inline]
-    pub fn tail<'a>(&'a self) -> &'a [T] {
-        self[].tail()
-    }
-
-    /// Returns all but the first `n' elements of a vector.
-    ///
-    /// # Failure
-    ///
-    /// Fails when there are fewer than `n` elements in the vector.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// #![allow(deprecated)]
-    /// let vec = vec![1i, 2, 3, 4];
-    /// assert!(vec.tailn(2) == [3, 4]);
-    /// ```
-    #[inline]
-    #[deprecated = "use slice_from"]
-    pub fn tailn<'a>(&'a self, n: uint) -> &'a [T] {
-        self[n..]
-    }
-
-    /// Returns a reference to the last element of a vector, or `None` if it is
-    /// empty.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let vec = vec![1i, 2, 3];
-    /// assert!(vec.last() == Some(&3));
-    /// ```
-    #[inline]
-    pub fn last<'a>(&'a self) -> Option<&'a T> {
-        self[].last()
-    }
-
     /// Deprecated: use `last_mut`.
     #[deprecated = "use last_mut"]
     pub fn mut_last<'a>(&'a mut self) -> Option<&'a mut T> {
-        self.last_mut()
+        self.last_mut().ok()
     }
 
     /// Returns a mutable reference to the last element of a vector, or `None`
@@ -1051,14 +968,14 @@ impl<T> Vec<T> {
     /// assert_eq!(vec, vec![1i, 2, 4]);
     /// ```
     #[inline]
-    pub fn last_mut<'a>(&'a mut self) -> Option<&'a mut T> {
+    pub fn last_mut<'a>(&'a mut self) -> VecResult<&'a mut T> {
         self.as_mut_slice().last_mut()
     }
 
     /// Removes an element from anywhere in the vector and return it, replacing
     /// it with the last element. This does not preserve ordering, but is O(1).
     ///
-    /// Returns `None` if `index` is out of bounds.
+    /// Returns `Err(OutOfBounds)` if `index` is out of bounds.
     ///
     /// # Example
     /// ```
@@ -1075,14 +992,14 @@ impl<T> Vec<T> {
     /// ```
     #[inline]
     #[unstable = "the naming of this function may be altered"]
-    pub fn swap_remove(&mut self, index: uint) -> Option<T> {
+    pub fn swap_remove(&mut self, index: uint) -> VecResult<T> {
         let length = self.len();
         if length > 0 && index < length - 1 {
-            self.as_mut_slice().swap(index, length - 1);
+            self.as_mut_slice().swap(index, length - 1).debug_ok();
         } else if index >= length {
-            return None
+            return Err(OutOfBounds)
         }
-        self.pop()
+        self.pop().ok_or(OutOfBounds)
     }
 
     /// Prepends an element to the vector.
@@ -1102,7 +1019,7 @@ impl<T> Vec<T> {
     #[inline]
     #[deprecated = "use insert(0, ...)"]
     pub fn unshift(&mut self, element: T) {
-        self.insert(0, element)
+        self.insert(0, element).unwrap()
     }
 
     /// Removes the first element from a vector and returns it, or `None` if
@@ -1124,16 +1041,16 @@ impl<T> Vec<T> {
     #[inline]
     #[deprecated = "use remove(0)"]
     pub fn shift(&mut self) -> Option<T> {
-        self.remove(0)
+        self.remove(0).ok()
     }
 
     /// Inserts an element at position `index` within the vector, shifting all
     /// elements after position `i` one position to the right.
     ///
-    /// # Failure
+    /// # Errors
     ///
-    /// Fails if `index` is not between `0` and the vector's length (both
-    /// bounds inclusive).
+    /// Returns `Err(OutOfBounds)` if `index` is not between `0` and
+    /// the vector's length (both bounds inclusive).
     ///
     /// # Example
     ///
@@ -1145,9 +1062,9 @@ impl<T> Vec<T> {
     /// assert_eq!(vec, vec![1, 4, 2, 3, 5]);
     /// ```
     #[unstable = "failure semantics need settling"]
-    pub fn insert(&mut self, index: uint, element: T) {
+    pub fn insert(&mut self, index: uint, element: T) -> VecResult<()> {
         let len = self.len();
-        assert!(index <= len);
+        if index > len { return Err(OutOfBounds) }
         // space for the new element
         self.reserve(len + 1);
 
@@ -1164,11 +1081,13 @@ impl<T> Vec<T> {
             }
             self.set_len(len + 1);
         }
+        Ok(())
     }
 
     /// Removes and returns the element at position `index` within the vector,
     /// shifting all elements after position `index` one position to the left.
-    /// Returns `None` if `i` is out of bounds.
+    ///
+    /// Returns `Err(OutOfBounds)` if `i` is out of bounds.
     ///
     /// # Example
     ///
@@ -1182,7 +1101,7 @@ impl<T> Vec<T> {
     /// assert_eq!(v, vec![1, 3]);
     /// ```
     #[unstable = "failure semantics need settling"]
-    pub fn remove(&mut self, index: uint) -> Option<T> {
+    pub fn remove(&mut self, index: uint) -> VecResult<T> {
         let len = self.len();
         if index < len {
             unsafe { // infallible
@@ -1192,7 +1111,7 @@ impl<T> Vec<T> {
                     let ptr = self.as_mut_ptr().offset(index as int);
                     // copy it out, unsafely having a copy of the value on
                     // the stack and in the vector at the same time.
-                    ret = Some(ptr::read(ptr as *const T));
+                    ret = Ok(ptr::read(ptr as *const T));
 
                     // Shift everything down to fill in that spot.
                     ptr::copy_memory(ptr, &*ptr.offset(1), len - index - 1);
@@ -1201,7 +1120,7 @@ impl<T> Vec<T> {
                 ret
             }
         } else {
-            None
+            Err(OutOfBounds)
         }
     }
 
@@ -1231,12 +1150,12 @@ impl<T> Vec<T> {
         self[mut start..end]
     }
 
-    /// Returns a mutable slice of `self` between `start` and `end`.
+    /// Returns a mutable slice of `self` spanning the interval [`start`, `end`).
     ///
-    /// # Failure
+    /// Returns `Err(OutOfBounds)` when the end of the new slice lies beyond the
+    /// end of the original slice (i.e. when `end > self.len()`).
     ///
-    /// Fails when `start` or `end` point outside the bounds of `self`, or when
-    /// `start` > `end`.
+    /// Returns `Err(InvalidSlice)` when `start > end`.
     ///
     /// # Example
     ///
@@ -1245,9 +1164,8 @@ impl<T> Vec<T> {
     /// assert!(vec[mut 0..2] == [1, 2]);
     /// ```
     #[inline]
-    pub fn slice_mut<'a>(&'a mut self, start: uint, end: uint)
-                         -> &'a mut [T] {
-        self[mut start..end]
+    pub fn slice_mut<'a>(&'a mut self, start: uint, end: uint) -> VecResult<&'a mut [T]> {
+        self[mut].slice_mut(start, end)
     }
 
     /// Deprecated: use "slice_from_mut".
@@ -1258,9 +1176,8 @@ impl<T> Vec<T> {
 
     /// Returns a mutable slice of `self` from `start` to the end of the `Vec`.
     ///
-    /// # Failure
-    ///
-    /// Fails when `start` points outside the bounds of self.
+    /// Returns `Err(OutOfBounds)` when `start` is strictly greater than the
+    /// length of the original slice.
     ///
     /// # Example
     ///
@@ -1269,8 +1186,8 @@ impl<T> Vec<T> {
     /// assert!(vec[mut 2..] == [3, 4]);
     /// ```
     #[inline]
-    pub fn slice_from_mut<'a>(&'a mut self, start: uint) -> &'a mut [T] {
-        self[mut start..]
+    pub fn slice_from_mut<'a>(&'a mut self, start: uint) -> VecResult<&'a mut [T]> {
+        self[mut].slice_from_mut(start)
     }
 
     /// Deprecated: use `slice_to_mut`.
@@ -1281,9 +1198,8 @@ impl<T> Vec<T> {
 
     /// Returns a mutable slice of `self` from the start of the `Vec` to `end`.
     ///
-    /// # Failure
-    ///
-    /// Fails when `end` points outside the bounds of self.
+    /// Returns `Err(OutOfBounds)` when `end` is strictly greater than the
+    /// length of the original slice.
     ///
     /// # Example
     ///
@@ -1292,14 +1208,14 @@ impl<T> Vec<T> {
     /// assert!(vec[mut ..2] == [1, 2]);
     /// ```
     #[inline]
-    pub fn slice_to_mut<'a>(&'a mut self, end: uint) -> &'a mut [T] {
-        self[mut ..end]
+    pub fn slice_to_mut<'a>(&'a mut self, end: uint) -> VecResult<&'a mut [T]> {
+        self[mut].slice_to_mut(end)
     }
 
     /// Deprecated: use `split_at_mut`.
     #[deprecated = "use split_at_mut"]
     pub fn mut_split_at<'a>(&'a mut self, mid: uint) -> (&'a mut [T], &'a mut [T]) {
-        self.split_at_mut(mid)
+        self.split_at_mut(mid).unwrap()
     }
 
     /// Returns a pair of mutable slices that divides the `Vec` at an index.
@@ -1308,9 +1224,7 @@ impl<T> Vec<T> {
     /// the index `mid` itself) and the second will contain all
     /// indices from `[mid, len)` (excluding the index `len` itself).
     ///
-    /// # Failure
-    ///
-    /// Fails if `mid > len`.
+    /// Returns `Err(OutOfBounds)` if `mid > len`.
     ///
     /// # Example
     ///
@@ -1337,7 +1251,8 @@ impl<T> Vec<T> {
     /// }
     /// ```
     #[inline]
-    pub fn split_at_mut<'a>(&'a mut self, mid: uint) -> (&'a mut [T], &'a mut [T]) {
+    pub fn split_at_mut<'a>(&'a mut self, mid: uint) ->
+        VecResult<(&'a mut [T], &'a mut [T])> {
         self[mut].split_at_mut(mid)
     }
 
@@ -1354,58 +1269,6 @@ impl<T> Vec<T> {
     pub fn reverse(&mut self) {
         self[mut].reverse()
     }
-
-    /// Returns a slice of `self` from `start` to the end of the vec.
-    ///
-    /// # Failure
-    ///
-    /// Fails when `start` points outside the bounds of self.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let vec = vec![1i, 2, 3];
-    /// assert!(vec[1..] == [2, 3]);
-    /// ```
-    #[inline]
-    pub fn slice_from<'a>(&'a self, start: uint) -> &'a [T] {
-        self[start..]
-    }
-
-    /// Returns a slice of self from the start of the vec to `end`.
-    ///
-    /// # Failure
-    ///
-    /// Fails when `end` points outside the bounds of self.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let vec = vec![1i, 2, 3, 4];
-    /// assert!(vec[..2] == [1, 2]);
-    /// ```
-    #[inline]
-    pub fn slice_to<'a>(&'a self, end: uint) -> &'a [T] {
-        self[..end]
-    }
-
-    /// Returns a slice containing all but the last element of the vector.
-    ///
-    /// # Failure
-    ///
-    /// Fails if the vector is empty
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let vec = vec![1i, 2, 3];
-    /// assert!(vec.init() == [1, 2]);
-    /// ```
-    #[inline]
-    pub fn init<'a>(&'a self) -> &'a [T] {
-        self[0..self.len() - 1]
-    }
-
 
     /// Returns an unsafe pointer to the vector's buffer.
     ///
@@ -1481,7 +1344,7 @@ impl<T> Vec<T> {
                 if !f(&v[i]) {
                     del += 1;
                 } else if del > 0 {
-                    v.swap(i-del, i);
+                    v.swap(i-del, i).debug_ok();
                 }
             }
         }
@@ -1539,19 +1402,6 @@ impl<T> Mutable for Vec<T> {
 }
 
 impl<T: PartialEq> Vec<T> {
-    /// Returns true if a vector contains an element equal to the given value.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let vec = vec![1i, 2, 3];
-    /// assert!(vec.contains(&1));
-    /// ```
-    #[inline]
-    pub fn contains(&self, x: &T) -> bool {
-        self.as_slice().contains(x)
-    }
-
     /// Removes consecutive repeated elements in the vector.
     ///
     /// If the vector is sorted, this removes all duplicates.

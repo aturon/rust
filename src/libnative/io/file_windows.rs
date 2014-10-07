@@ -446,7 +446,7 @@ pub fn readlink(p: &CString) -> IoResult<CString> {
     });
     let ret = match ret {
         Some(ref s) if s.as_slice().starts_with(r"\\?\") => {
-            Ok(Path::new(s.as_slice().slice_from(4)).to_c_str())
+            Ok(Path::new(s[4..]).to_c_str())
         }
         Some(s) => Ok(Path::new(s).to_c_str()),
         None => Err(super::last_error()),

@@ -102,7 +102,8 @@ pub use core::slice::{Chunks, AsSlice, ImmutableSlice, ImmutablePartialEqSlice};
 pub use core::slice::{ImmutableOrdSlice, MutableSlice, Items, MutItems};
 pub use core::slice::{MutSplits, MutChunks, Splits};
 pub use core::slice::{bytes, mut_ref_slice, ref_slice, MutableCloneableSlice};
-pub use core::slice::{Found, NotFound};
+pub use core::slice::{Found, NotFound, SliceError, SliceResult, OutOfBounds};
+pub use core::slice::{InvalidSlice, Empty};
 
 // Functional utilities
 
@@ -197,7 +198,7 @@ impl Iterator<(uint, uint)> for ElementSwaps {
         match max {
             Some((i, sd)) => {
                 let j = new_pos(i, sd.dir);
-                self.sdir.as_mut_slice().swap(i, j);
+                self.sdir.as_mut_slice().swap(i, j).debug_ok();
 
                 // Swap the direction of each larger SizeDirection
                 for x in self.sdir.iter_mut() {
@@ -252,7 +253,7 @@ impl<T: Clone> Iterator<Vec<T>> for Permutations<T> {
             Some((0,0)) => Some(self.v.clone()),
             Some((a, b)) => {
                 let elt = self.v.clone();
-                self.v.as_mut_slice().swap(a, b);
+                self.v.as_mut_slice().swap(a, b).debug_ok();
                 Some(elt)
             }
         }
@@ -704,7 +705,7 @@ impl<'a, T: Ord> MutableOrdSlice<T> for &'a mut [T] {
         }
 
         // Step 3: Swap that element with the pivot
-        self.swap(j, i-1);
+        self.swap(j, i-1).debug_ok();
 
         // Step 4: Reverse the (previously) weakly decreasing part
         self[mut i..].reverse();
@@ -737,7 +738,7 @@ impl<'a, T: Ord> MutableOrdSlice<T> for &'a mut [T] {
         }
 
         // Step 4: Swap that element with the pivot
-        self.swap(i-1, j);
+        self.swap(i-1, j).debug_ok();
 
         true
     }

@@ -206,7 +206,7 @@ impl<T> RingBuf<T> {
         assert!(j < self.len());
         let ri = self.raw_index(i);
         let rj = self.raw_index(j);
-        self.elts.as_mut_slice().swap(ri, rj);
+        self.elts.as_mut_slice().swap(ri, rj).debug_ok();
     }
 
     /// Returns the index in the underlying `Vec` for a given logical element
@@ -283,17 +283,16 @@ impl<T> RingBuf<T> {
             //    start_index to self.elts.len()
             // and then
             //    0 to end_index
-            let (temp, remaining1) = self.elts.split_at_mut(start_index);
-            let (remaining2, _) = temp.split_at_mut(end_index);
+            let (temp, remaining1) = self.elts.split_at_mut(start_index).unwrap();
+            let (remaining2, _) = temp.split_at_mut(end_index).unwrap();
             MutItems { remaining1: remaining1,
                                  remaining2: remaining2,
                                  nelts: self.nelts }
         } else {
             // Items to iterate goes from start_index to end_index:
-            let (empty, elts) = self.elts.split_at_mut(0);
-            let remaining1 = elts[mut start_index..end_index];
+            let remaining1 = self.elts[mut start_index..end_index];
             MutItems { remaining1: remaining1,
-                                 remaining2: empty,
+                                 remaining2: &mut [],
                                  nelts: self.nelts }
         }
     }
@@ -429,11 +428,11 @@ fn grow<T>(nelts: uint, loptr: &mut uint, elts: &mut Vec<Option<T>>) {
     assert!(newlen - nelts/2 >= nelts);
     if lo <= (nelts - lo) { // A
         for i in range(0u, lo) {
-            elts.as_mut_slice().swap(i, nelts + i);
+            elts.as_mut_slice().swap(i, nelts + i).debug_ok();
         }
     } else {                // B
         for i in range(lo, nelts) {
-            elts.as_mut_slice().swap(i, newlen - nelts + i);
+            elts.as_mut_slice().swap(i, newlen - nelts + i).debug_ok();
         }
         *loptr += newlen - nelts;
     }

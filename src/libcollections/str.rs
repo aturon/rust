@@ -61,7 +61,7 @@ use core::iter::AdditiveIterator;
 use core::mem;
 use core::prelude::{Char, Clone, Collection, Eq, Equiv, ImmutableSlice};
 use core::prelude::{Iterator, MutableSlice, None, Option, Ord, Ordering};
-use core::prelude::{PartialEq, PartialOrd, Result, AsSlice, Some, Tuple2};
+use core::prelude::{PartialEq, PartialOrd, Result, AsSlice, Some, Ok, Err, Tuple2};
 use core::prelude::{range};
 
 use {Deque, MutableSeq};
@@ -78,7 +78,8 @@ pub use core::str::{CharSplitsN, AnyLines, MatchIndices, StrSplits};
 pub use core::str::{eq_slice, is_utf8, is_utf16, Utf16Items};
 pub use core::str::{Utf16Item, ScalarValue, LoneSurrogate, utf16_items};
 pub use core::str::{truncate_utf16_at_nul, utf8_char_width, CharRange};
-pub use core::str::{Str, StrSlice};
+pub use core::str::{Str, StrSlice, StrError, StrResult};
+pub use core::str::{OutOfBounds, InvalidSlice, Empty, NotOnBoundary, NotUtf8};
 pub use unicode::str::{UnicodeStrSlice, Words, Graphemes, GraphemeIndices};
 
 /*
@@ -209,7 +210,7 @@ fn canonical_sort(comb: &mut [(char, u8)]) {
             let class_a = *comb[j-1].ref1();
             let class_b = *comb[j].ref1();
             if class_a != 0 && class_b != 0 && class_a > class_b {
-                comb.swap(j-1, j);
+                comb.swap(j-1, j).debug_ok();
                 swapped = true;
             }
         }
@@ -237,13 +238,13 @@ impl<'a> Iterator<char> for Decompositions<'a> {
     #[inline]
     fn next(&mut self) -> Option<char> {
         match self.buffer.as_slice().head() {
-            Some(&(c, 0)) => {
+            Ok(&(c, 0)) => {
                 self.sorted = false;
-                self.buffer.remove(0);
+                self.buffer.remove(0).debug_ok();
                 return Some(c);
             }
-            Some(&(c, _)) if self.sorted => {
-                self.buffer.remove(0);
+            Ok(&(c, _)) if self.sorted => {
+                self.buffer.remove(0).debug_ok();
                 return Some(c);
             }
             _ => self.sorted = false
@@ -276,12 +277,12 @@ impl<'a> Iterator<char> for Decompositions<'a> {
         }
 
         match self.buffer.remove(0) {
-            Some((c, 0)) => {
+            Ok((c, 0)) => {
                 self.sorted = false;
                 Some(c)
             }
-            Some((c, _)) => Some(c),
-            None => None
+            Ok((c, _)) => Some(c),
+            Err(_) => None
         }
     }
 

@@ -327,6 +327,13 @@ impl<T, E> Result<T, E> {
         }
     }
 
+    /// A debug assertion that the `Result` is `Ok`.
+    #[inline]
+    #[experimental]
+    pub fn debug_ok(&self) {
+        debug_assert!(self.is_ok(), "expected result to be `Ok`")
+    }
+
     /// Returns true if the result is `Err`
     ///
     /// # Example
@@ -343,7 +350,6 @@ impl<T, E> Result<T, E> {
     pub fn is_err(&self) -> bool {
         !self.is_ok()
     }
-
 
     /////////////////////////////////////////////////////////////////////////
     // Adapter for each variant

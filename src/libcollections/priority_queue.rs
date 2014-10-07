@@ -463,7 +463,7 @@ impl<T: Ord> PriorityQueue<T> {
         let mut end = q.len();
         while end > 1 {
             end -= 1;
-            q.data.as_mut_slice().swap(0, end);
+            q.data.as_mut_slice().swap(0, end).debug_ok();
             q.siftdown_range(0, end)
         }
         q.into_vec()

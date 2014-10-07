@@ -234,7 +234,7 @@ pub struct LogLevel(pub u32);
 impl fmt::Show for LogLevel {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let LogLevel(level) = *self;
-        match LOG_LEVEL_NAMES.get(level as uint - 1) {
+        match LOG_LEVEL_NAMES.get(level as uint - 1).ok() {
             Some(name) => name.fmt(fmt),
             None => level.fmt(fmt)
         }

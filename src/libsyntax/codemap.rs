@@ -295,9 +295,9 @@ impl FileMap {
         let lines = self.lines.borrow();
         let begin: BytePos = *lines.get(line as uint) - self.start_pos;
         let begin = begin.to_uint();
-        let slice = self.src.as_slice().slice_from(begin);
+        let slice = self.src[begin..];
         match slice.find('\n') {
-            Some(e) => slice.slice_to(e).to_string(),
+            Some(e) => slice[..e].to_string(),
             None => slice.to_string()
         }
     }
@@ -341,7 +341,7 @@ impl CodeMap {
         // FIXME #12884: no efficient/safe way to remove from the start of a string
         // and reuse the allocation.
         let mut src = if src.as_slice().starts_with("\ufeff") {
-            String::from_str(src.as_slice().slice_from(3))
+            String::from_str(src[3..])
         } else {
             String::from_str(src.as_slice())
         };

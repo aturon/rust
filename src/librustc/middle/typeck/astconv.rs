@@ -1130,7 +1130,7 @@ fn ty_of_method_or_bare_fn<'tcx, AC: AstConv<'tcx>>(
 
     // HACK(eddyb) replace the fake self type in the AST with the actual type.
     let input_params = if self_ty.is_some() {
-        decl.inputs.slice_from(1)
+        decl.inputs[1..]
     } else {
         decl.inputs.as_slice()
     };
@@ -1454,7 +1454,7 @@ pub fn compute_opt_region_bound(tcx: &ty::ctxt,
     // of derived region bounds. If so, use that. Otherwise, report an
     // error.
     let r = *derived_region_bounds.get(0);
-    if derived_region_bounds.slice_from(1).iter().any(|r1| r != *r1) {
+    if derived_region_bounds[1..].iter().any(|r1| r != *r1) {
         tcx.sess.span_err(
             span,
             format!("ambiguous lifetime bound, \

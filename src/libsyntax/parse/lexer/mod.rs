@@ -199,7 +199,7 @@ impl<'a> StringReader<'a> {
         m.push_str(": ");
         let from = self.byte_offset(from_pos).to_uint();
         let to = self.byte_offset(to_pos).to_uint();
-        m.push_str(self.filemap.src.as_slice().slice(from, to));
+        m.push_str(self.filemap.src[from .. to]);
         self.fatal_span_(from_pos, to_pos, m.as_slice());
     }
 
@@ -282,7 +282,7 @@ impl<'a> StringReader<'a> {
             while i < s.len() {
                 let str::CharRange { ch, next } = s.char_range_at(i);
                 if ch == '\r' {
-                    if j < i { buf.push_str(s.slice(j, i)); }
+                    if j < i { buf.push_str(s[j .. i]); }
                     j = next;
                     if next >= s.len() || s.char_at(next) != '\n' {
                         let pos = start + BytePos(i as u32);
@@ -292,7 +292,7 @@ impl<'a> StringReader<'a> {
                 }
                 i = next;
             }
-            if j < s.len() { buf.push_str(s.slice_from(j)); }
+            if j < s.len() { buf.push_str(s[j..]); }
             buf
         }
     }

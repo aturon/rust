@@ -3229,8 +3229,8 @@ impl<'a> Resolver<'a> {
                         let msg = format!("Could not find `{}` in `{}`",
                                             // idx +- 1 to account for the
                                             // colons on either side
-                                            mpath.slice_from(idx + 1),
-                                            mpath.slice_to(idx - 1));
+                                            mpath[idx + 1..],
+                                            mpath[..idx - 1]);
                         return Failed(Some((span, msg)));
                     },
                     None => return Failed(None),

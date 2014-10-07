@@ -1536,8 +1536,8 @@ pub trait Buffer: Reader {
             }
         }
         match str::from_utf8(buf[..width]) {
-            Some(s) => Ok(s.char_at(0)),
-            None => Err(standard_error(InvalidInput))
+            Ok(s) => Ok(s.char_at(0).unwrap()),
+            Err(_) => Err(standard_error(InvalidInput))
         }
     }
 

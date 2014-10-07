@@ -24,15 +24,53 @@ use cmp;
 use cmp::{PartialEq, Eq};
 use collections::Collection;
 use default::Default;
+use fmt;
 use iter::{Map, Iterator};
 use iter::{DoubleEndedIterator, ExactSize};
 use iter::range;
 use num::{CheckedMul, Saturating};
 use option::{Option, None, Some};
+use result::{Result, Ok, Err};
 use raw::Repr;
 use slice::ImmutableSlice;
 use slice;
 use uint;
+
+//
+// Error reporting
+//
+
+#[deriving(PartialEq, Eq, PartialOrd, Ord, Clone)]
+/// Errors arising from string slice operations.
+pub enum StrError {
+    /// An index was larger than the length of the slice.
+    OutOfBounds,
+    /// An attempt to make a subslice with `start` > `end`
+    InvalidSlice,
+    /// The slice must be nonempty for the operation to succeed.
+    Empty,
+    /// A byte index was used that did not correspond to a utf8 codepoint sequence boundary.
+    NotOnBoundary,
+    /// The data provided was not in utf8 format; an invalid utf8 sequence
+    /// occurs at the given index.
+    NotUtf8(uint),
+}
+
+impl fmt::Show for StrError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            OutOfBounds => write!(fmt, "index out of bounds"),
+            InvalidSlice => write!(fmt, "invalid slice: start > end"),
+            Empty => write!(fmt, "slice is empty"),
+            NotOnBoundary => write!(fmt, "index is not on a unicode codepoint boundary"),
+            NotUtf8(i) =>
+                write!(fmt, "invalid utf8 codepoint sequence starting at index {}", i)
+        }
+    }
+}
+
+/// A specialized `Result` for string slice errors.
+pub type StrResult<T> = Result<T, StrError>;
 
 /*
 Section: Creating a string
@@ -44,10 +82,11 @@ Section: Creating a string
 /// returned as a '&str' instead of a '&[u8]'
 ///
 /// Returns None if the slice is not utf-8.
-pub fn from_utf8<'a>(v: &'a [u8]) -> Option<&'a str> {
-    if is_utf8(v) {
-        Some(unsafe { raw::from_utf8(v) })
-    } else { None }
+pub fn from_utf8<'a>(v: &'a [u8]) -> StrResult<&'a str> {
+    match validate_utf8(v) {
+        Ok(_) => Ok(unsafe { raw::from_utf8(v) }),
+        Err(i) => Err(NotUtf8(i)),
+    }
 }
 
 /// Something that can be used to compare against a character
@@ -309,7 +348,7 @@ impl<'a, Sep: CharEq> Iterator<&'a str> for CharSplits<'a, Sep> {
         } else {
             for (idx, ch) in self.string.char_indices() {
                 if self.sep.matches(ch) {
-                    next_split = Some((idx, self.string.char_range_at(idx).next));
+                    next_split = Some((idx, self.string.char_range_at(idx).unwrap().next));
                     break;
                 }
             }
@@ -351,7 +390,7 @@ for CharSplits<'a, Sep> {
         } else {
             for (idx, ch) in self.string.char_indices().rev() {
                 if self.sep.matches(ch) {
-                    next_split = Some((idx, self.string.char_range_at(idx).next));
+                    next_split = Some((idx, self.string.char_range_at(idx).unwrap().next));
                     break;
                 }
             }
@@ -392,16 +431,19 @@ impl NaiveSearcher {
     }
 
     fn next(&mut self, haystack: &[u8], needle: &[u8]) -> Option<(uint, uint)> {
-        while self.position + needle.len() <= haystack.len() {
-            if haystack[self.position .. self.position + needle.len()] == needle {
-                let match_pos = self.position;
-                self.position += needle.len(); // add 1 for all matches
-                return Some((match_pos, match_pos + needle.len()));
-            } else {
-                self.position += 1;
+        loop {
+            match haystack.slice(self.position, self.position + needle.len()) {
+                Ok(s) if s == needle => {
+                    let match_pos = self.position;
+                    self.position += needle.len(); // add 1 for all matches
+                    return Some((match_pos, match_pos + needle.len()));
+                },
+                Ok(_) => {
+                    self.position += 1
+                },
+                Err(_) => return None
             }
         }
-        None
     }
 }
 
@@ -710,13 +752,13 @@ impl<'a> Iterator<&'a str> for StrSplits<'a> {
 
         match self.it.next() {
             Some((from, to)) => {
-                let ret = Some(self.it.haystack.slice(self.last_end, from));
+                let ret = Some(self.it.haystack.slice(self.last_end, from).unwrap());
                 self.last_end = to;
                 ret
             }
             None => {
                 self.finished = true;
-                Some(self.it.haystack.slice(self.last_end, self.it.haystack.len()))
+                Some(self.it.haystack.slice_from(self.last_end).unwrap())
             }
         }
     }
@@ -789,31 +831,32 @@ pub fn eq_slice(a: &str, b: &str) -> bool {
 Section: Misc
 */
 
-/// Walk through `iter` checking that it's a valid UTF-8 sequence,
-/// returning `true` in that case, or, if it is invalid, `false` with
-/// `iter` reset such that it is pointing at the first byte in the
-/// invalid sequence.
+/// Walk through `iter` checking that it's a valid UTF-8 sequence, returning
+/// Ok(()) in that case, or, if it is invalid, Err(i) with `i` the index of the
+/// first byte in the invalid sequence.
 #[inline(always)]
-fn run_utf8_validation_iterator(iter: &mut slice::Items<u8>) -> bool {
-    loop {
-        // save the current thing we're pointing at.
-        let old = *iter;
+fn validate_utf8(v: &[u8]) -> Result<(), uint> {
+    let mut iter = v.iter().enumerate();
+    let mut cur_seq_start;
 
-        // restore the iterator we had at the start of this codepoint.
-        macro_rules! err ( () => { {*iter = old; return false} });
+    loop {
+        macro_rules! err ( () => { return Err(cur_seq_start) } )
         macro_rules! next ( () => {
                 match iter.next() {
-                    Some(a) => *a,
+                    Some((_, a)) => *a,
                     // we needed data, but there was none: error!
                     None => err!()
                 }
             });
 
         let first = match iter.next() {
-            Some(&b) => b,
+            Some((i, &b)) => {
+                cur_seq_start = i;
+                b
+            },
             // we're at the end of the iterator and a codepoint
             // boundary at the same time, so this string is valid.
-            None => return true
+            None => return Ok(())
         };
 
         // ASCII characters are always valid, so only large
@@ -866,7 +909,7 @@ fn run_utf8_validation_iterator(iter: &mut slice::Items<u8>) -> bool {
 
 /// Determines if a vector of bytes contains valid UTF-8.
 pub fn is_utf8(v: &[u8]) -> bool {
-    run_utf8_validation_iterator(&mut v.iter())
+    validate_utf8(v).is_ok()
 }
 
 /// Determines if a vector of `u16` contains valid UTF-16
@@ -1038,9 +1081,9 @@ pub fn utf8_char_width(b: u8) -> uint {
     return UTF8_CHAR_WIDTH[b as uint] as uint;
 }
 
-/// Struct that contains a `char` and the index of the first byte of
-/// the next `char` in a string.  This can be used as a data structure
-/// for iterating over the UTF-8 bytes of a string.
+/// Struct that contains a `char` and the index of the first byte of the next
+/// `char` in a string.  This can be used as a data structure for iterating over
+/// the UTF-8 bytes of a string.
 pub struct CharRange {
     /// Current `char`
     pub ch: char,
@@ -1173,17 +1216,17 @@ pub mod traits {
 
         #[inline]
         fn slice_from_<'a>(&'a self, from: &uint) -> &'a str {
-            self.slice_from(*from)
+            self.slice_from(*from).unwrap()
         }
 
         #[inline]
         fn slice_to_<'a>(&'a self, to: &uint) -> &'a str {
-            self.slice_to(*to)
+            self.slice_to(*to).unwrap()
         }
 
         #[inline]
         fn slice_<'a>(&'a self, from: &uint, to: &uint) -> &'a str {
-            self.slice(*from, *to)
+            self.slice(*from, *to).unwrap()
         }
     }
     #[cfg(not(stage0))]
@@ -1195,17 +1238,17 @@ pub mod traits {
 
         #[inline]
         fn slice_from_or_fail<'a>(&'a self, from: &uint) -> &'a str {
-            self.slice_from(*from)
+            self.slice_from(*from).unwrap()
         }
 
         #[inline]
         fn slice_to_or_fail<'a>(&'a self, to: &uint) -> &'a str {
-            self.slice_to(*to)
+            self.slice_to(*to).unwrap()
         }
 
         #[inline]
         fn slice_or_fail<'a>(&'a self, from: &uint, to: &uint) -> &'a str {
-            self.slice(*from, *to)
+            self.slice(*from, *to).unwrap()
         }
     }
 }
@@ -1467,8 +1510,10 @@ pub trait StrSlice<'a> {
     ///
     /// This operation is `O(1)`.
     ///
-    /// Fails when `begin` and `end` do not point to valid characters
-    /// or point beyond the last character of the string.
+    /// Returns `Err(NotOnBoundary)` if `begin` or `end` do not point to valid
+    /// character boundaries; returns `Err(OutOfBounds)` if either points beyond
+    /// the last character of the string; returns `Err(InvalidSlice)` if `begin
+    /// > end`.
     ///
     /// See also `slice_to` and `slice_from` for slicing prefixes and
     /// suffixes of strings, and `slice_chars` for slicing based on
@@ -1492,28 +1537,22 @@ pub trait StrSlice<'a> {
     /// // byte 100 is outside the string
     /// // s.slice(3, 100);
     /// ```
-    fn slice(&self, begin: uint, end: uint) -> &'a str;
+    fn slice(&self, begin: uint, end: uint) -> StrResult<&'a str>;
 
     /// Returns a slice of the string from `begin` to its end.
     ///
     /// Equivalent to `self.slice(begin, self.len())`.
     ///
-    /// Fails when `begin` does not point to a valid character, or is
-    /// out of bounds.
-    ///
     /// See also `slice`, `slice_to` and `slice_chars`.
-    fn slice_from(&self, begin: uint) -> &'a str;
+    fn slice_from(&self, begin: uint) -> StrResult<&'a str>;
 
     /// Returns a slice of the string from the beginning to byte
     /// `end`.
     ///
     /// Equivalent to `self.slice(0, end)`.
     ///
-    /// Fails when `end` does not point to a valid character, or is
-    /// out of bounds.
-    ///
     /// See also `slice`, `slice_from` and `slice_chars`.
-    fn slice_to(&self, end: uint) -> &'a str;
+    fn slice_to(&self, end: uint) -> StrResult<&'a str>;
 
     /// Returns a slice of the string from the character range
     /// [`begin`..`end`).
@@ -1528,9 +1567,6 @@ pub trait StrSlice<'a> {
     /// variants that use byte indices rather than code point
     /// indices.
     ///
-    /// Fails if `begin` > `end` or the either `begin` or `end` are
-    /// beyond the last character of the string.
-    ///
     /// # Example
     ///
     /// ```rust
@@ -1538,7 +1574,7 @@ pub trait StrSlice<'a> {
     /// assert_eq!(s.slice_chars(0, 4), "Löwe");
     /// assert_eq!(s.slice_chars(5, 7), "老虎");
     /// ```
-    fn slice_chars(&self, begin: uint, end: uint) -> &'a str;
+    fn slice_chars(&self, begin: uint, end: uint) -> StrResult<&'a str>;
 
     /// Returns true if `needle` is a prefix of the string.
     ///
@@ -1612,7 +1648,7 @@ pub trait StrSlice<'a> {
     /// The start and end of the string (when `index == self.len()`)
     /// are considered to be boundaries.
     ///
-    /// Fails if `index` is greater than `self.len()`.
+    /// Returns `Err(OutOfBounds) if `index` is greater than `self.len()`.
     ///
     /// # Example
     ///
@@ -1629,7 +1665,7 @@ pub trait StrSlice<'a> {
     /// // third byte of `老`
     /// assert!(!s.is_char_boundary(8));
     /// ```
-    fn is_char_boundary(&self, index: uint) -> bool;
+    fn is_char_boundary(&self, index: uint) -> StrResult<bool>;
 
     /// Pluck a character out of a string and return the index of the next
     /// character.
@@ -1680,11 +1716,11 @@ pub trait StrSlice<'a> {
     /// A record {ch: char, next: uint} containing the char value and the byte
     /// index of the next Unicode character.
     ///
-    /// # Failure
+    /// # Errors
     ///
-    /// If `i` is greater than or equal to the length of the string.
-    /// If `i` is not the index of the beginning of a valid UTF-8 character.
-    fn char_range_at(&self, start: uint) -> CharRange;
+    /// * `Err(OutOfBounds)` if `i` is greater than or equal to the length of the string.
+    /// * `Err(NotOnBoundary)` if `i` is not the index of the beginning of a valid UTF-8 character.
+    fn char_range_at(&self, start: uint) -> StrResult<CharRange>;
 
     /// Given a byte position and a str, return the previous char and its position.
     ///
@@ -1692,11 +1728,11 @@ pub trait StrSlice<'a> {
     ///
     /// Returns 0 for next index if called on start index 0.
     ///
-    /// # Failure
+    /// # Errors
     ///
-    /// If `i` is greater than the length of the string.
-    /// If `i` is not an index following a valid UTF-8 character.
-    fn char_range_at_reverse(&self, start: uint) -> CharRange;
+    /// * `Err(OutOfBounds)` if `i` is greater than the length of the string.
+    /// * `Err(NotOnBoundary)` if `i` is not an index following a valid UTF-8 character.
+    fn char_range_at_reverse(&self, start: uint) -> StrResult<CharRange>;
 
     /// Plucks the character starting at the `i`th byte of a string.
     ///
@@ -1709,19 +1745,21 @@ pub trait StrSlice<'a> {
     /// assert_eq!(s.char_at(4), 'c');
     /// ```
     ///
-    /// # Failure
+    /// # Errors
     ///
-    /// If `i` is greater than or equal to the length of the string.
-    /// If `i` is not the index of the beginning of a valid UTF-8 character.
-    fn char_at(&self, i: uint) -> char;
+    /// * `Err(OutOfBounds)` if `i` is greater than or equal to the length of the
+    ///   string.
+    /// * `Err(NotOnBoundary)` if `i` is not the index of the beginning of a valid
+    ///   UTF-8 character.
+    fn char_at(&self, i: uint) -> StrResult<char>;
 
     /// Plucks the character ending at the `i`th byte of a string.
     ///
-    /// # Failure
+    /// # Errors
     ///
-    /// If `i` is greater than the length of the string.
-    /// If `i` is not an index following a valid UTF-8 character.
-    fn char_at_reverse(&self, i: uint) -> char;
+    /// * `Err(OutOfBounds)` if `i` is greater than the length of the string.
+    /// * `Err(NotOnBoundary)` if `i` is not an index following a valid UTF-8 character.
+    fn char_at_reverse(&self, i: uint) -> StrResult<char>;
 
     /// Work with the byte buffer of a string as a byte slice.
     ///
@@ -1851,11 +1889,9 @@ pub trait StrSlice<'a> {
     fn utf16_units(&self) -> Utf16CodeUnits<'a>;
 }
 
-#[inline(never)]
-fn slice_error_fail(s: &str, begin: uint, end: uint) -> ! {
-    assert!(begin <= end);
-    fail!("index {} and/or {} in `{}` do not lie on character boundary",
-          begin, end, s);
+// read a byte, translating slice errors to str errors
+fn get_byte(s: &str, i: uint) -> StrResult<u8> {
+    s.as_bytes().get(i).map(|b| *b).map_err(|_| OutOfBounds)
 }
 
 impl<'a> StrSlice<'a> for &'a str {
@@ -1950,9 +1986,10 @@ impl<'a> StrSlice<'a> for &'a str {
 
     fn lines_any(&self) -> AnyLines<'a> {
         self.lines().map(|line| {
-            let l = line.len();
-            if l > 0 && line.as_bytes()[l - 1] == b'\r' { line.slice(0, l - 1) }
-            else { line }
+            match line.as_bytes().last() {
+                Ok(&b'\r') => line[0 .. line.len() - 1],
+                _ => line
+            }
         })
     }
 
@@ -1960,39 +1997,33 @@ impl<'a> StrSlice<'a> for &'a str {
     fn char_len(&self) -> uint { self.chars().count() }
 
     #[inline]
-    fn slice(&self, begin: uint, end: uint) -> &'a str {
+    fn slice(&self, begin: uint, end: uint) -> StrResult<&'a str> {
+        if begin > end { return Err(InvalidSlice) }
+
         // is_char_boundary checks that the index is in [0, .len()]
-        if begin <= end &&
-           self.is_char_boundary(begin) &&
-           self.is_char_boundary(end) {
-            unsafe { raw::slice_unchecked(*self, begin, end) }
-        } else {
-            slice_error_fail(*self, begin, end)
+        if !try!(self.is_char_boundary(begin)) || !try!(self.is_char_boundary(end)) {
+            return Err(NotOnBoundary)
         }
+
+        Ok(unsafe { raw::slice_unchecked(*self, begin, end) })
     }
 
     #[inline]
-    fn slice_from(&self, begin: uint) -> &'a str {
+    fn slice_from(&self, begin: uint) -> StrResult<&'a str> {
         // is_char_boundary checks that the index is in [0, .len()]
-        if self.is_char_boundary(begin) {
-            unsafe { raw::slice_unchecked(*self, begin, self.len()) }
-        } else {
-            slice_error_fail(*self, begin, self.len())
-        }
+        if !try!(self.is_char_boundary(begin)) { return Err(NotOnBoundary) }
+        Ok(unsafe { raw::slice_unchecked(*self, begin, self.len()) })
     }
 
     #[inline]
-    fn slice_to(&self, end: uint) -> &'a str {
+    fn slice_to(&self, end: uint) -> StrResult<&'a str> {
         // is_char_boundary checks that the index is in [0, .len()]
-        if self.is_char_boundary(end) {
-            unsafe { raw::slice_unchecked(*self, 0, end) }
-        } else {
-            slice_error_fail(*self, 0, end)
-        }
+        if !try!(self.is_char_boundary(end)) { return Err(NotOnBoundary) }
+        Ok(unsafe { raw::slice_unchecked(*self, 0, end) })
     }
 
-    fn slice_chars(&self, begin: uint, end: uint) -> &'a str {
-        assert!(begin <= end);
+    fn slice_chars(&self, begin: uint, end: uint) -> StrResult<&'a str> {
+        if begin > end { return Err(InvalidSlice) }
         let mut count = 0;
         let mut begin_byte = None;
         let mut end_byte = None;
@@ -2008,9 +2039,9 @@ impl<'a> StrSlice<'a> for &'a str {
         if end_byte.is_none() && count == end { end_byte = Some(self.len()) }
 
         match (begin_byte, end_byte) {
-            (None, _) => fail!("slice_chars: `begin` is beyond end of string"),
-            (_, None) => fail!("slice_chars: `end` is beyond end of string"),
-            (Some(a), Some(b)) => unsafe { raw::slice_bytes(*self, a, b) }
+            (None, _) => Err(OutOfBounds),
+            (_, None) => Err(OutOfBounds),
+            (Some(a), Some(b)) => Ok(unsafe { raw::slice_bytes(*self, a, b) })
         }
     }
 
@@ -2035,7 +2066,7 @@ impl<'a> StrSlice<'a> for &'a str {
         match cur.rfind(|c: char| !to_trim.matches(c)) {
             None => "",
             Some(i) => {
-                let right = cur.char_range_at(i).next;
+                let right = cur.char_range_at(i).unwrap().next;
                 unsafe { raw::slice_bytes(cur, 0, right) }
             }
         }
@@ -2054,83 +2085,102 @@ impl<'a> StrSlice<'a> for &'a str {
         match self.rfind(|c: char| !to_trim.matches(c)) {
             None => "",
             Some(last) => {
-                let next = self.char_range_at(last).next;
+                let next = self.char_range_at(last).unwrap().next;
                 unsafe { raw::slice_bytes(*self, 0u, next) }
             }
         }
     }
 
     #[inline]
-    fn is_char_boundary(&self, index: uint) -> bool {
-        if index == self.len() { return true; }
+    fn is_char_boundary(&self, index: uint) -> StrResult<bool> {
+        if index == self.len() { return Ok(true); }
         match self.as_bytes().get(index) {
-            None => false,
-            Some(&b) => b < 128u8 || b >= 192u8,
+            Err(_) => Err(OutOfBounds),
+            Ok(&b) => Ok(b < 128u8 || b >= 192u8),
         }
     }
 
     #[inline]
-    fn char_range_at(&self, i: uint) -> CharRange {
-        if self.as_bytes()[i] < 128u8 {
-            return CharRange {ch: self.as_bytes()[i] as char, next: i + 1 };
+    fn char_range_at(&self, i: uint) -> StrResult<CharRange> {
+        let b = try!(get_byte(*self, i));
+        if b < 128u8 {
+            return Ok(CharRange {ch: b as char, next: i + 1 });
         }
 
         // Multibyte case is a fn to allow char_range_at to inline cleanly
-        fn multibyte_char_range_at(s: &str, i: uint) -> CharRange {
-            let mut val = s.as_bytes()[i] as u32;
-            let w = UTF8_CHAR_WIDTH[val as uint] as uint;
-            assert!((w != 0));
+        fn multibyte_char_range_at(s: &str, i: uint) -> StrResult<CharRange> {
+            let w_byte = try!(get_byte(s, i));
+            let w = utf8_char_width(w_byte);
+            if w == 0 { return Err(NotOnBoundary) }
 
+            let mut val = w_byte as u32;
             val = utf8_first_byte!(val, w);
-            val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 1]);
-            if w > 2 { val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 2]); }
-            if w > 3 { val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 3]); }
+            val = utf8_acc_cont_byte!(val, try!(get_byte(s, i + 1)
+                                                .map_err(|_| NotOnBoundary)));
+            if w > 2 {
+                val = utf8_acc_cont_byte!(val, try!(get_byte(s, i + 2)
+                                                    .map_err(|_| NotOnBoundary)));
+            }
+            if w > 3 {
+                val = utf8_acc_cont_byte!(val, try!(get_byte(s, i + 3)
+                                                    .map_err(|_| NotOnBoundary)));
+            }
 
-            return CharRange {ch: unsafe { mem::transmute(val) }, next: i + w};
+            Ok(CharRange {ch: unsafe { mem::transmute(val) }, next: i + w})
         }
 
-        return multibyte_char_range_at(*self, i);
+        multibyte_char_range_at(*self, i)
     }
 
     #[inline]
-    fn char_range_at_reverse(&self, start: uint) -> CharRange {
+    fn char_range_at_reverse(&self, start: uint) -> StrResult<CharRange> {
         let mut prev = start;
 
         prev = prev.saturating_sub(1);
-        if self.as_bytes()[prev] < 128 {
-            return CharRange{ch: self.as_bytes()[prev] as char, next: prev}
+        if *try!(self.as_bytes().get(prev).map_err(|_| OutOfBounds)) < 128 {
+            return Ok(CharRange{ch: self.as_bytes()[prev] as char, next: prev})
         }
 
         // Multibyte case is a fn to allow char_range_at_reverse to inline cleanly
-        fn multibyte_char_range_at_reverse(s: &str, mut i: uint) -> CharRange {
+        fn multibyte_char_range_at_reverse(s: &str, mut i: uint) -> StrResult<CharRange> {
             // while there is a previous byte == 10......
             while i > 0 && s.as_bytes()[i] & !CONT_MASK == TAG_CONT_U8 {
                 i -= 1u;
             }
 
-            let mut val = s.as_bytes()[i] as u32;
-            let w = UTF8_CHAR_WIDTH[val as uint] as uint;
-            assert!((w != 0));
+            let w_byte = s.as_bytes()[i];
+            let w = utf8_char_width(w_byte);
+            if w == 0 { return Err(NotOnBoundary) }
 
+            let mut val = w_byte as u32;
             val = utf8_first_byte!(val, w);
-            val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 1]);
-            if w > 2 { val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 2]); }
-            if w > 3 { val = utf8_acc_cont_byte!(val, s.as_bytes()[i + 3]); }
+            val = utf8_acc_cont_byte!(val, try!(get_byte(s, i + 1)
+                                                .map_err(|_| NotOnBoundary)));
+            if w > 2 {
+                val = utf8_acc_cont_byte!(val, try!(get_byte(s, i + 2)
+                                                    .map_err(|_| NotOnBoundary)));
+            }
+            if w > 3 {
+                val = utf8_acc_cont_byte!(val, try!(get_byte(s, i + 3)
+                                                    .map_err(|_| NotOnBoundary)));
+            }
 
-            return CharRange {ch: unsafe { mem::transmute(val) }, next: i};
+            Ok(CharRange {ch: unsafe { mem::transmute(val) }, next: i})
         }
 
-        return multibyte_char_range_at_reverse(*self, prev);
+        multibyte_char_range_at_reverse(*self, prev)
     }
 
     #[inline]
-    fn char_at(&self, i: uint) -> char {
-        self.char_range_at(i).ch
+    fn char_at(&self, i: uint) -> StrResult<char> {
+        let range = try!(self.char_range_at(i));
+        Ok(range.ch)
     }
 
     #[inline]
-    fn char_at_reverse(&self, i: uint) -> char {
-        self.char_range_at_reverse(i).ch
+    fn char_at_reverse(&self, i: uint) -> StrResult<char> {
+        let range = try!(self.char_range_at_reverse(i));
+        Ok(range.ch)
     }
 
     #[inline]
@@ -2175,7 +2225,7 @@ impl<'a> StrSlice<'a> for &'a str {
         if self.is_empty() {
             return (None, *self);
         } else {
-            let CharRange {ch, next} = self.char_range_at(0u);
+            let CharRange {ch, next} = self.char_range_at(0u).unwrap();
             let next_s = unsafe { raw::slice_bytes(*self, next, self.len()) };
             return (Some(ch), next_s);
         }

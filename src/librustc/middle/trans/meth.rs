@@ -482,7 +482,7 @@ pub fn trans_trait_callee_from_llval<'blk, 'tcx>(bcx: Block<'blk, 'tcx>,
         ty::ty_bare_fn(ref f) if f.abi == Rust || f.abi == RustCall => {
             type_of_rust_fn(ccx,
                             Some(Type::i8p(ccx)),
-                            f.sig.inputs.slice_from(1),
+                            f.sig.inputs[1..],
                             f.sig.output,
                             f.abi)
         }

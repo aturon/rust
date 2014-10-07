@@ -171,7 +171,7 @@ pub mod windows {
                     done = true;
                 }
                 if k != 0 && done {
-                    let sub = buf.slice(0, k as uint);
+                    let sub = buf[0 .. k as uint];
                     // We want to explicitly catch the case when the
                     // closure returned invalid UTF-16, rather than
                     // set `res` to None and continue.

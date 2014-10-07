@@ -134,7 +134,7 @@ impl<'a, W: Writer> RepeatFasta<'a, W> {
         let mut n = n;
         while n > 0 {
             bytes = min(LINE_LEN, n);
-            try!(self.out.write(buf.slice(pos, pos + bytes)));
+            try!(self.out.write(buf[pos .. pos + bytes]));
             try!(self.out.write_u8('\n' as u8));
             pos += bytes;
             if pos > alu_len {

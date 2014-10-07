@@ -382,7 +382,7 @@ impl Uuid {
 
         // Strip off URN prefix if present
         if us.starts_with("urn:uuid:") {
-            us = us.slice(9, orig_len);
+            us = us[9 .. orig_len];
         }
 
         // Make sure all chars are either hex digits or hyphen

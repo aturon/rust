@@ -1461,7 +1461,7 @@ impl<'a> State<'a> {
                 try!(self.print_call_post(args.as_slice()));
             }
             ast::ExprMethodCall(ident, ref tys, ref args) => {
-                let base_args = args.slice_from(1);
+                let base_args = args[1..];
                 try!(self.print_expr(&**args.get(0)));
                 try!(word(&mut self.s, "."));
                 try!(self.print_ident(ident.node));
@@ -2139,7 +2139,7 @@ impl<'a> State<'a> {
         let args = if first {
             decl.inputs.as_slice()
         } else {
-            decl.inputs.slice_from(1)
+            decl.inputs[1..]
         };
 
         for arg in args.iter() {

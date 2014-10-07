@@ -691,7 +691,7 @@ impl fmt::Show for ModuleSummary {
 
             try!(write!(f, "<tr>"));
             try!(write!(f, "<td><a href='{}'>{}</a></td>",
-                        Vec::from_slice(context.slice_from(1))
+                        Vec::from_slice(context[1..])
                             .append_one("index.html").connect("/"),
                         path));
             try!(write!(f, "<td class='summary-column'>"));

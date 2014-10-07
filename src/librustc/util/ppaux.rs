@@ -515,7 +515,7 @@ pub fn parameterized(cx: &ctxt,
 pub fn ty_to_short_str(cx: &ctxt, typ: t) -> String {
     let mut s = typ.repr(cx).to_string();
     if s.len() >= 32u {
-        s = s.as_slice().slice(0u, 32u).to_string();
+        s = s[0u .. 32u].to_string();
     }
     return s;
 }

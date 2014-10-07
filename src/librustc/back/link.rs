@@ -213,7 +213,7 @@ pub fn build_link_meta(sess: &Session, krate: &ast::Crate,
 fn truncated_hash_result(symbol_hasher: &mut Sha256) -> String {
     let output = symbol_hasher.result_bytes();
     // 64 bits should be enough to avoid collisions.
-    output.slice_to(8).to_hex().to_string()
+    output[..8].to_hex().to_string()
 }
 
 
@@ -286,7 +286,7 @@ pub fn sanitize(s: &str) -> String {
                 let mut tstr = String::new();
                 char::escape_unicode(c, |c| tstr.push_char(c));
                 result.push_char('$');
-                result.push_str(tstr.as_slice().slice_from(1));
+                result.push_str(tstr[1..]);
             }
         }
     }

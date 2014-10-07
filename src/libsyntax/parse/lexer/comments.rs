@@ -81,7 +81,7 @@ pub fn strip_doc_comment_decoration(comment: &str) -> String {
         while j > i && lines.get(j - 1).as_slice().trim().is_empty() {
             j -= 1;
         }
-        return lines.slice(i, j).iter().map(|x| (*x).clone()).collect();
+        return lines[i .. j].iter().map(|x| (*x).clone()).collect();
     }
 
     /// remove a "[ \t]*\*" block from each line, if possible
@@ -226,7 +226,7 @@ fn trim_whitespace_prefix_and_push_line(lines: &mut Vec<String> ,
     let s1 = match all_whitespace(s.as_slice(), col) {
         Some(col) => {
             if col < len {
-                s.as_slice().slice(col, len).to_string()
+                s[col .. len].to_string()
             } else {
                 "".to_string()
             }

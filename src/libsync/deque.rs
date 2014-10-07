@@ -171,7 +171,7 @@ impl<T: Send> BufferPool<T> {
         unsafe {
             let mut pool = self.pool.lock();
             match pool.iter().position(|v| v.size() > buf.size()) {
-                Some(i) => pool.insert(i, buf),
+                Some(i) => pool.insert(i, buf).debug_ok(),
                 None => pool.push(buf),
             }
         }

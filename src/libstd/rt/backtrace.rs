@@ -71,7 +71,7 @@ fn demangle(writer: &mut Writer, s: &str) -> IoResult<()> {
     // symbols because we could have any function in the backtrace.
     let mut valid = true;
     if s.len() > 4 && s.starts_with("_ZN") && s.ends_with("E") {
-        let mut chars = s.slice(3, s.len() - 1).chars();
+        let mut chars = s[3 .. s.len() - 1].chars();
         while valid {
             let mut i = 0;
             for c in chars {
@@ -96,7 +96,7 @@ fn demangle(writer: &mut Writer, s: &str) -> IoResult<()> {
     if !valid {
         try!(writer.write_str(s));
     } else {
-        let mut s = s.slice_from(3);
+        let mut s = s[3..];
         let mut first = true;
         while s.len() > 1 {
             if !first {
@@ -105,19 +105,19 @@ fn demangle(writer: &mut Writer, s: &str) -> IoResult<()> {
                 first = false;
             }
             let mut rest = s;
-            while rest.char_at(0).is_digit() {
-                rest = rest.slice_from(1);
+            while rest.char_at(0).unwrap().is_digit() {
+                rest = rest[1..];
             }
-            let i: uint = from_str(s.slice_to(s.len() - rest.len())).unwrap();
-            s = rest.slice_from(i);
-            rest = rest.slice_to(i);
+            let i: uint = from_str(s[..s.len() - rest.len()]).unwrap();
+            s = rest[i..];
+            rest = rest[..i];
             while rest.len() > 0 {
                 if rest.starts_with("$") {
                     macro_rules! demangle(
                         ($($pat:expr => $demangled:expr),*) => ({
                             $(if rest.starts_with($pat) {
                                 try!(writer.write_str($demangled));
-                                rest = rest.slice_from($pat.len());
+                                rest = rest[$pat.len()..];
                               } else)*
                             {
                                 try!(writer.write_str(rest));
@@ -150,8 +150,8 @@ fn demangle(writer: &mut Writer, s: &str) -> IoResult<()> {
                         None => rest.len(),
                         Some(i) => i,
                     };
-                    try!(writer.write_str(rest.slice_to(idx)));
-                    rest = rest.slice_from(idx);
+                    try!(writer.write_str(rest[..idx]));
+                    rest = rest[idx..];
                 }
             }
         }

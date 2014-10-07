@@ -156,7 +156,7 @@ impl<'a> FmtStrs<'a> {
 
         let values = values.iter().map(|s| {
             if s.len() > 1020 {
-                s.as_slice().slice_to(1020)
+                s[..1020]
             } else {
                 s.as_slice()
             }

@@ -1327,7 +1327,7 @@ impl<'a, 'tcx> LookupContext<'a, 'tcx> {
             MethodTraitObject(..) => {
                 // For annoying reasons, we've already handled the
                 // substitution of self for object calls.
-                let args = fn_sig.inputs.slice_from(1).iter().map(|t| {
+                let args = fn_sig.inputs[1..].iter().map(|t| {
                     t.subst(tcx, &all_substs)
                 });
                 Some(*fn_sig.inputs.get(0)).into_iter().chain(args).collect()

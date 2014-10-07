@@ -1018,7 +1018,7 @@ fn scan_until_char(haystack: &str, needle: char, idx: &mut uint) -> bool {
     if *idx >= haystack.len() {
         return false;
     }
-    let opt = haystack.slice_from(*idx).find(needle);
+    let opt = haystack[*idx..].find(needle);
     if opt.is_none() {
         return false;
     }

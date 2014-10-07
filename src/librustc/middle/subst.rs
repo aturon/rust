@@ -268,9 +268,9 @@ pub struct VecPerParamSpace<T> {
     // Here is how the representation corresponds to the abstraction
     // i.e. the "abstraction function" AF:
     //
-    // AF(self) = (self.content.slice_to(self.type_limit),
-    //             self.content.slice(self.type_limit, self.self_limit),
-    //             self.content.slice_from(self.self_limit))
+    // AF(self) = (self.content[..self.type_limit],
+    //             self.content[self.type_limit .. self.self_limit],
+    //             self.content[self.self_limit..])
     type_limit: uint,
     self_limit: uint,
     content: Vec<T>,
@@ -393,7 +393,7 @@ impl<T> VecPerParamSpace<T> {
 
     pub fn get_slice<'a>(&'a self, space: ParamSpace) -> &'a [T] {
         let (start, limit) = self.limits(space);
-        self.content.slice(start, limit)
+        self.content[start .. limit]
     }
 
     pub fn get_mut_slice<'a>(&'a mut self, space: ParamSpace) -> &'a mut [T] {

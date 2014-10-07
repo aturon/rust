@@ -217,7 +217,7 @@ pub type Result = result::Result<Matches, Fail_>;
 impl Name {
     fn from_str(nm: &str) -> Name {
         if nm.len() == 1u {
-            Short(nm.char_at(0u))
+            Short(nm.char_at(0u).unwrap())
         } else {
             Long(nm.to_string())
         }
@@ -252,7 +252,7 @@ impl OptGroup {
                 aliases: Vec::new()
             },
             (1,0) => Opt {
-                name: Short(short_name.as_slice().char_at(0)),
+                name: Short(short_name.as_slice().char_at(0).unwrap()),
                 hasarg: hasarg,
                 occur: occur,
                 aliases: Vec::new()
@@ -263,7 +263,7 @@ impl OptGroup {
                 occur:  occur,
                 aliases: vec!(
                     Opt {
-                        name: Short(short_name.as_slice().char_at(0)),
+                        name: Short(short_name.as_slice().char_at(0).unwrap()),
                         hasarg: hasarg,
                         occur:  occur,
                         aliases: Vec::new()
@@ -557,7 +557,7 @@ pub fn getopts(args: &[String], optgrps: &[OptGroup]) -> Result {
             let mut names;
             let mut i_arg = None;
             if cur.as_bytes()[1] == b'-' {
-                let tail = cur.as_slice().slice(2, curlen);
+                let tail = cur[2 .. curlen];
                 let tail_eq: Vec<&str> = tail.split('=').collect();
                 if tail_eq.len() <= 1 {
                     names = vec!(Long(tail.to_string()));
@@ -570,7 +570,7 @@ pub fn getopts(args: &[String], optgrps: &[OptGroup]) -> Result {
                 let mut j = 1;
                 names = Vec::new();
                 while j < curlen {
-                    let range = cur.as_slice().char_range_at(j);
+                    let range = cur.as_slice().char_range_at(j).unwrap();
                     let opt = Short(range.ch);
 
                     /* In a series of potential options (eg. -aheJ), if we
@@ -593,8 +593,7 @@ pub fn getopts(args: &[String], optgrps: &[OptGroup]) -> Result {
                     };
 
                     if arg_follows && range.next < curlen {
-                        i_arg = Some(cur.as_slice()
-                                        .slice(range.next, curlen).to_string());
+                        i_arg = Some(cur.slice(range.next, curlen).to_string());
                         break;
                     }
 
@@ -854,9 +853,9 @@ fn each_split_within<'a>(ss: &'a str, lim: uint, it: |&'a str| -> bool)
             (B, Cr, UnderLim) => { B }
             (B, Cr, OverLim)  if (i - last_start + 1) > lim
                             => fail!("word starting with {} longer than limit!",
-                                    ss.slice(last_start, i + 1)),
+                                    ss[last_start .. i + 1]),
             (B, Cr, OverLim)  => {
-                *cont = it(ss.slice(slice_start, last_end));
+                *cont = it(ss[slice_start .. last_end]);
                 slice_start = last_start;
                 B
             }
@@ -866,7 +865,7 @@ fn each_split_within<'a>(ss: &'a str, lim: uint, it: |&'a str| -> bool)
             }
             (B, Ws, OverLim)  => {
                 last_end = i;
-                *cont = it(ss.slice(slice_start, last_end));
+                *cont = it(ss[slice_start .. last_end]);
                 A
             }
 
@@ -875,14 +874,14 @@ fn each_split_within<'a>(ss: &'a str, lim: uint, it: |&'a str| -> bool)
                 B
             }
             (C, Cr, OverLim)  => {
-                *cont = it(ss.slice(slice_start, last_end));
+                *cont = it(ss[slice_start .. last_end]);
                 slice_start = i;
                 last_start = i;
                 last_end = i;
                 B
             }
             (C, Ws, OverLim)  => {
-                *cont = it(ss.slice(slice_start, last_end));
+                *cont = it(ss[slice_start .. last_end]);
                 A
             }
             (C, Ws, UnderLim) => {

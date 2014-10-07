@@ -1096,7 +1096,7 @@ mod test {
         }
         check!(unlink(filename));
         let read_str = str::from_utf8(read_mem).unwrap();
-        assert_eq!(read_str, message.slice(4, 8));
+        assert_eq!(read_str, message[4 .. 8]);
         assert_eq!(tell_pos_pre_read, set_cursor);
         assert_eq!(tell_pos_post_read, message.len() as u64);
     }

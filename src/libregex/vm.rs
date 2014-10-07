@@ -376,16 +376,18 @@ impl<'t> CharReader<'t> {
         }
         if ic > 0 {
             let i = cmp::min(ic, self.input.len());
-            let prev = self.input.char_range_at_reverse(i);
+            let prev = self.input.char_range_at_reverse(i).unwrap();
             self.prev = Some(prev.ch);
         }
-        if ic < self.input.len() {
-            let cur = self.input.char_range_at(ic);
-            self.cur = Some(cur.ch);
-            self.next = cur.next;
-            self.next
-        } else {
-            self.input.len() + 1
+        match self.input.char_range_at(ic) {
+            Ok(cur) => {
+                self.cur = Some(cur.ch);
+                self.next = cur.next;
+                self.next
+            }
+            Err(_) => {
+                self.input.len() + 1
+            }
         }
     }
 
@@ -394,13 +396,15 @@ impl<'t> CharReader<'t> {
     #[inline]
     pub fn advance(&mut self) -> uint {
         self.prev = self.cur;
-        if self.next < self.input.len() {
-            let cur = self.input.char_range_at(self.next);
-            self.cur = Some(cur.ch);
-            self.next = cur.next;
-        } else {
-            self.cur = None;
-            self.next = self.input.len() + 1;
+        match self.input.char_range_at(self.next) {
+            Ok(cur) => {
+                self.cur = Some(cur.ch);
+                self.next = cur.next;
+            }
+            Err(_) => {
+                self.cur = None;
+                self.next = self.input.len() + 1;
+            }
         }
         self.next
     }

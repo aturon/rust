@@ -189,7 +189,7 @@ fn main() {
 
            // start processing if this is the one
            ('>', false) => {
-               match line.as_slice().slice_from(1).find_str("THREE") {
+               match line[1..].find_str("THREE") {
                    option::Some(_) => { proc_mode = true; }
                    option::None    => { }
                }

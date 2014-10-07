@@ -202,7 +202,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// ```
     #[inline]
     fn as_str<'a>(&'a self) -> Option<&'a str> {
-        str::from_utf8(self.as_vec())
+        str::from_utf8(self.as_vec()).ok()
     }
 
     /// Returns the path as a byte vector
@@ -298,7 +298,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// ```
     #[inline]
     fn dirname_str<'a>(&'a self) -> Option<&'a str> {
-        str::from_utf8(self.dirname())
+        str::from_utf8(self.dirname()).ok()
     }
 
     /// Returns the file component of `self`, as a byte vector.
@@ -332,7 +332,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// ```
     #[inline]
     fn filename_str<'a>(&'a self) -> Option<&'a str> {
-        self.filename().and_then(str::from_utf8)
+        self.filename().and_then(|x| str::from_utf8(x).ok())
     }
 
     /// Returns the stem of the filename of `self`, as a byte vector.
@@ -378,7 +378,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// ```
     #[inline]
     fn filestem_str<'a>(&'a self) -> Option<&'a str> {
-        self.filestem().and_then(str::from_utf8)
+        self.filestem().and_then(|x| str::from_utf8(x).ok())
     }
 
     /// Returns the extension of the filename of `self`, as an optional byte vector.
@@ -425,7 +425,7 @@ pub trait GenericPath: Clone + GenericPathUnsafe {
     /// ```
     #[inline]
     fn extension_str<'a>(&'a self) -> Option<&'a str> {
-        self.extension().and_then(str::from_utf8)
+        self.extension().and_then(|x| str::from_utf8(x).ok())
     }
 
     /// Replaces the filename portion of the path with the given byte vector or string.
@@ -803,7 +803,7 @@ pub trait BytesContainer {
     /// Returns the receiver interpreted as a utf-8 string, if possible
     #[inline]
     fn container_as_str<'a>(&'a self) -> Option<&'a str> {
-        str::from_utf8(self.container_as_bytes())
+        str::from_utf8(self.container_as_bytes()).ok()
     }
     /// Returns whether .container_as_str() is guaranteed to not fail
     // FIXME (#8888): Remove unused arg once ::<for T> works

@@ -48,8 +48,8 @@ fn parse_token_list(file: &str) -> HashMap<String, Token> {
             None => continue
         };
 
-        let val = line.slice_to(eq);
-        let num = line.slice_from(eq + 1);
+        let val = line[..eq];
+        let num = line[eq + 1..];
 
         let tok = match val {
             "SHR" => BINOP(SHR),
@@ -140,12 +140,12 @@ fn str_to_binop(s: &str) -> BinOp {
 fn fix(mut lit: &str) -> ast::Name {
     if lit.char_at(0) == 'r' {
         if lit.char_at(1) == 'b' {
-            lit = lit.slice_from(2)
+            lit = lit[2..]
         } else {
-            lit = lit.slice_from(1);
+            lit = lit[1..];
         }
     } else if lit.char_at(0) == 'b' {
-        lit = lit.slice_from(1);
+        lit = lit[1..];
     }
 
     let leading_hashes = count(lit);
@@ -157,7 +157,7 @@ fn fix(mut lit: &str) -> ast::Name {
 /// Assuming a char/byte literal, strip the 'b' prefix and the single quotes.
 fn fixchar(mut lit: &str) -> ast::Name {
     if lit.char_at(0) == 'b' {
-        lit = lit.slice_from(1);
+        lit = lit[1..];
     }
 
     parse::token::intern(lit.slice(1, lit.len() - 1))

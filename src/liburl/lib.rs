@@ -484,7 +484,7 @@ pub fn get_scheme(rawurl: &str) -> DecodeResult<(&str, &str)> {
                 if i == 0 {
                     Err("url: Scheme cannot be empty.".to_string())
                 } else {
-                    Ok((rawurl.slice(0,i), rawurl.slice(i+1,rawurl.len())))
+                    Ok((rawurl[0 ..i], rawurl.slice(i+1,rawurl.len())))
                 }
             }
             _ => Err("url: Invalid character in scheme.".to_string()),
@@ -577,7 +577,7 @@ fn get_authority(rawurl: &str) ->
                 pos = i;
                 if input == Unreserved {
                     // must be port
-                    host = rawurl.slice(begin, i);
+                    host = rawurl[begin .. i];
                     st = InPort;
                 } else {
                     // can't be sure whether this is an ipv6 address or a port
@@ -592,7 +592,7 @@ fn get_authority(rawurl: &str) ->
               }
               Ip6Host => {
                 if colon_count > 7 {
-                    host = rawurl.slice(begin, i);
+                    host = rawurl[begin .. i];
                     pos = i;
                     st = InPort;
                 }
@@ -607,13 +607,13 @@ fn get_authority(rawurl: &str) ->
             colon_count = 0; // reset count
             match st {
               Start => {
-                let user = rawurl.slice(begin, i).to_string();
+                let user = rawurl[begin .. i].to_string();
                 userinfo = Some(UserInfo::new(user, None));
                 st = InHost;
               }
               PassHostPort => {
-                let user = rawurl.slice(begin, pos).to_string();
-                let pass = rawurl.slice(pos+1, i).to_string();
+                let user = rawurl[begin .. pos].to_string();
+                let pass = rawurl[pos+1 .. i].to_string();
                 userinfo = Some(UserInfo::new(user, Some(pass)));
                 st = InHost;
               }
@@ -632,26 +632,26 @@ fn get_authority(rawurl: &str) ->
 
     // finish up
     match st {
-      Start => host = rawurl.slice(begin, end),
+      Start => host = rawurl[begin .. end],
       PassHostPort
       | Ip6Port => {
         if input != Digit {
             return Err("Non-digit characters in port.".to_string());
         }
-        host = rawurl.slice(begin, pos);
-        port = Some(rawurl.slice(pos+1, end));
+        host = rawurl[begin .. pos];
+        port = Some(rawurl[pos+1 .. end]);
       }
       Ip6Host
-      | InHost => host = rawurl.slice(begin, end),
+      | InHost => host = rawurl[begin .. end],
       InPort => {
         if input != Digit {
             return Err("Non-digit characters in port.".to_string());
         }
-        port = Some(rawurl.slice(pos+1, end));
+        port = Some(rawurl[pos+1 .. end]);
       }
     }
 
-    let rest = rawurl.slice(end, len);
+    let rest = rawurl[end .. len];
     // If we have a port string, ensure it parses to u16.
     let port = match port {
         None => None,
@@ -690,8 +690,8 @@ fn get_path(rawurl: &str, is_authority: bool) -> DecodeResult<(String, &str)> {
         Err("Non-empty path must begin with \
             '/' in presence of authority.".to_string())
     } else {
-        Ok((try!(decode_component(rawurl.slice(0, end))),
-            rawurl.slice(end, len)))
+        Ok((try!(decode_component(rawurl[0 .. end])),
+            rawurl[end .. len]))
     }
 }
 

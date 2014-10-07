@@ -415,7 +415,7 @@ impl Tm {
 /// Parses the time from the string according to the format string.
 pub fn strptime(s: &str, format: &str) -> Result<Tm, String> {
     fn match_str(s: &str, pos: uint, needle: &str) -> bool {
-        return s.slice_from(pos).starts_with(needle);
+        return s[pos..].starts_with(needle);
     }
 
     fn match_strs(ss: &str, pos: uint, strs: &[(&str, i32)])

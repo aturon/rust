@@ -266,7 +266,7 @@ pub trait Rng {
             // invariant: elements with index >= i have been locked in place.
             i -= 1u;
             // lock element i in place.
-            values.swap(i, self.gen_range(0u, i + 1u));
+            values.swap(i, self.gen_range(0u, i + 1u)).debug_ok();
         }
     }
 }

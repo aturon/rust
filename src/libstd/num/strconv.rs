@@ -413,18 +413,18 @@ pub fn float_to_str_bytes_common<T:NumCast+Zero+One+PartialEq+PartialOrd+Float+
                     // If reached left end of number, have to
                     // insert additional digit:
                     if i < 0
-                    || *buf.get(i as uint) == b'-'
-                    || *buf.get(i as uint) == b'+' {
-                        buf.insert((i + 1) as uint, value2ascii(1));
+                    || buf[i as uint] == b'-'
+                    || buf[i as uint] == b'+' {
+                        buf.insert((i + 1) as uint, value2ascii(1)).debug_ok();
                         break;
                     }
 
                     // Skip the '.'
-                    if *buf.get(i as uint) == b'.' { i -= 1; continue; }
+                    if buf[i as uint] == b'.' { i -= 1; continue; }
 
                     // Either increment the digit,
                     // or set to 0 if max and carry the 1.
-                    let current_digit = ascii2value(*buf.get(i as uint));
+                    let current_digit = ascii2value(buf[i as uint]);
                     if current_digit < (radix - 1) {
                         *buf.get_mut(i as uint) = value2ascii(current_digit+1);
                         break;
@@ -446,25 +446,25 @@ pub fn float_to_str_bytes_common<T:NumCast+Zero+One+PartialEq+PartialOrd+Float+
         let mut i = buf_max_i;
 
         // discover trailing zeros of fractional part
-        while i > start_fractional_digits && *buf.get(i) == b'0' {
+        while i > start_fractional_digits && buf[i] == b'0' {
             i -= 1;
         }
 
         // Only attempt to truncate digits if buf has fractional digits
         if i >= start_fractional_digits {
             // If buf ends with '.', cut that too.
-            if *buf.get(i) == b'.' { i -= 1 }
+            if buf[i] == b'.' { i -= 1 }
 
             // only resize buf if we actually remove digits
             if i < buf_max_i {
-                buf = Vec::from_slice(buf.slice(0, i + 1));
+                buf = Vec::from_slice(buf[..i + 1]);
             }
         }
     } // If exact and trailing '.', just cut that
     else {
         let max_i = buf.len() - 1;
-        if *buf.get(max_i) == b'.' {
-            buf = Vec::from_slice(buf.slice(0, max_i));
+        if buf[max_i] == b'.' {
+            buf = Vec::from_slice(buf[..max_i]);
         }
     }
 

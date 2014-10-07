@@ -569,7 +569,7 @@ mod tests {
                 let take = (left + 1u) / 2u;
                 sh.input_str(t.input
                               .as_slice()
-                              .slice(len - left, take + len - left));
+                              [len - left .. take + len - left]);
                 left = left - take;
             }
             let out_str = sh.result_str();
@@ -620,7 +620,7 @@ mod tests {
             let next: uint = rng.gen_range(0, 2 * blocksize + 1);
             let remaining = total_size - count;
             let size = if next > remaining { remaining } else { next };
-            digest.input(buffer.slice_to(size));
+            digest.input(buffer[..size]);
             count += size;
         }
 

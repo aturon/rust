@@ -269,10 +269,10 @@ impl Pattern {
                 '[' => {
 
                     if i <= chars.len() - 4 && chars[i + 1] == '!' {
-                        match chars.slice_from(i + 3).position_elem(&']') {
+                        match chars[i + 3..].position_elem(&']') {
                             None => (),
                             Some(j) => {
-                                let chars = chars.slice(i + 2, i + 3 + j);
+                                let chars = chars[i + 2 .. i + 3 + j];
                                 let cs = parse_char_specifiers(chars);
                                 tokens.push(AnyExcept(cs));
                                 i += j + 4;
@@ -281,10 +281,10 @@ impl Pattern {
                         }
                     }
                     else if i <= chars.len() - 3 && chars[i + 1] != '!' {
-                        match chars.slice_from(i + 2).position_elem(&']') {
+                        match chars[i + 2..].position_elem(&']') {
                             None => (),
                             Some(j) => {
-                                let cs = parse_char_specifiers(chars.slice(i + 1, i + 2 + j));
+                                let cs = parse_char_specifiers(chars[i + 1 .. i + 2 + j]);
                                 tokens.push(AnyWithin(cs));
                                 i += j + 3;
                                 continue;
@@ -391,7 +391,7 @@ impl Pattern {
              && is_sep(prev_char.get().unwrap_or('/')))
         };
 
-        for (ti, token) in self.tokens.slice_from(i).iter().enumerate() {
+        for (ti, token) in self.tokens[i..].iter().enumerate() {
             match *token {
                 AnySequence => {
                     loop {

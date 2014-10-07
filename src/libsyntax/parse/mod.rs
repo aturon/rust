@@ -393,7 +393,7 @@ pub fn char_lit(lit: &str) -> (char, int) {
     let msg2 = msg.as_slice();
 
     let esc: |uint| -> Option<(char, int)> = |len|
-        num::from_str_radix(lit.slice(2, len), 16)
+        num::from_str_radix(lit[2 .. len], 16)
         .and_then(char::from_u32)
         .map(|x| (x, len as int));
 
@@ -451,7 +451,7 @@ pub fn str_lit(lit: &str) -> String {
                             eat(&mut chars);
                         } else {
                             // otherwise, a normal escape
-                            let (c, n) = char_lit(lit.slice_from(i));
+                            let (c, n) = char_lit(lit[i..]);
                             for _ in range(0, n - 1) { // we don't need to move past the first \
                                 chars.next();
                             }
@@ -550,7 +550,7 @@ pub fn byte_lit(lit: &str) -> (u8, uint) {
             b'\'' => b'\'',
             b'0' => b'\0',
             _ => {
-                match ::std::num::from_str_radix::<u64>(lit.slice(2, 4), 16) {
+                match ::std::num::from_str_radix::<u64>(lit[2 .. 4], 16) {
                     Some(c) =>
                         if c > 0xFF {
                             fail!(err(2))
@@ -600,7 +600,7 @@ pub fn binary_lit(lit: &str) -> Rc<Vec<u8>> {
                     }
                     _ => {
                         // otherwise, a normal escape
-                        let (c, n) = byte_lit(lit.slice_from(i));
+                        let (c, n) = byte_lit(lit[i..]);
                         // we don't need to move past the first \
                         for _ in range(0, n - 1) {
                             chars.next();
@@ -652,7 +652,7 @@ pub fn integer_lit(s: &str, sd: &SpanHandler, sp: Span) -> ast::Lit_ {
     }
 
     if base != 10 {
-        s = s.slice_from(2);
+        s = s[2..];
     }
 
     let last = s.len() - 1;

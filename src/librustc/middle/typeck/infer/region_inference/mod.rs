@@ -580,7 +580,7 @@ impl<'a, 'tcx> RegionVarBindings<'a, 'tcx> {
                                    -> Vec<RegionVid>
     {
         self.undo_log.borrow()
-            .slice_from(mark.length)
+            [mark.length..]
             .iter()
             .filter_map(|&elt| match elt {
                 AddVar(vid) => Some(vid),
@@ -612,7 +612,7 @@ impl<'a, 'tcx> RegionVarBindings<'a, 'tcx> {
             debug!("result_index={}, r={}", result_index, r);
 
             for undo_entry in
-                self.undo_log.borrow().slice_from(mark.length).iter()
+                self.undo_log.borrow()[mark.length..].iter()
             {
                 match undo_entry {
                     &AddConstraint(ConstrainVarSubVar(a, b)) => {

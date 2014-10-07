@@ -22,6 +22,7 @@ use core::cmp;
 use core::collections::Collection;
 use core::iter::{Filter, AdditiveIterator, Iterator, DoubleEndedIterator};
 use core::option::{Option, None, Some};
+use core::result::Ok;
 use core::str::{CharSplits, StrSlice};
 use u_char;
 use u_char::UnicodeChar;
@@ -261,7 +262,7 @@ impl<'a> Iterator<&'a str> for Graphemes<'a> {
                 Start if '\r' == ch => {
                     let slen = self.string.len();
                     let nidx = idx + 1;
-                    if nidx != slen && self.string.char_at(nidx) == '\n' {
+                    if self.string.char_at(nidx) == Ok('\n') {
                         idx = nidx;             // rule GB3
                     }
                     break;                      // rule GB4
@@ -313,14 +314,14 @@ impl<'a> Iterator<&'a str> for Graphemes<'a> {
         }
 
         self.cat = if take_curr {
-            idx = self.string.char_range_at(idx).next;
+            idx = self.string.char_range_at(idx).unwrap().next;
             None
         } else {
             Some(cat)
         };
 
-        let retstr = self.string.slice_to(idx);
-        self.string = self.string.slice_from(idx);
+        let retstr = self.string[..idx];
+        self.string = self.string[idx..];
         Some(retstr)
     }
 }
@@ -361,7 +362,7 @@ impl<'a> DoubleEndedIterator<&'a str> for Graphemes<'a> {
             // HangulLVT means the letter to the right is T
             state = match state {
                 Start if '\n' == ch => {
-                    if idx > 0 && '\r' == self.string.char_at_reverse(idx) {
+                    if idx > 0 && '\r' == self.string.char_at_reverse(idx).unwrap() {
                         idx -= 1;       // rule GB3
                     }
                     break;              // rule GB4
@@ -420,8 +421,8 @@ impl<'a> DoubleEndedIterator<&'a str> for Graphemes<'a> {
             Some(cat)
         };
 
-        let retstr = self.string.slice_from(idx);
-        self.string = self.string.slice_to(idx);
+        let retstr = self.string[idx..];
+        self.string = self.string[..idx];
         Some(retstr)
     }
 }

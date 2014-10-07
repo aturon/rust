@@ -165,12 +165,12 @@ impl <K, V> Node<K, V> {
 
     /// Get the node's value at the given index
     pub fn val(&self, index: uint) -> Option<&V> {
-        self.vals.as_slice().get(index)
+        self.vals.as_slice().get(index).ok()
     }
 
     /// Get the node's value at the given index
     pub fn val_mut(&mut self, index: uint) -> Option<&mut V> {
-        self.vals.as_mut_slice().get_mut(index)
+        self.vals.as_mut_slice().get_mut(index).ok()
     }
 
     /// Get the node's value mutably without any bounds checks.
@@ -180,12 +180,12 @@ impl <K, V> Node<K, V> {
 
     /// Get the node's edge at the given index
     pub fn edge(&self, index: uint) -> Option<&Node<K,V>> {
-        self.edges.as_slice().get(index)
+        self.edges.as_slice().get(index).ok()
     }
 
     /// Get the node's edge mutably at the given index
     pub fn edge_mut(&mut self, index: uint) -> Option<&mut Node<K,V>> {
-        self.edges.as_mut_slice().get_mut(index)
+        self.edges.as_mut_slice().get_mut(index).ok()
     }
 
     /// Get the node's edge mutably without any bounds checks.
@@ -252,7 +252,7 @@ impl <K, V> Node<K, V> {
     /// Remove the key-value pair at the given index
     pub fn remove_as_leaf(&mut self, index: uint) -> (K, V) {
         match (self.keys.remove(index), self.vals.remove(index)) {
-            (Some(k), Some(v)) => (k, v),
+            (Ok(k), Ok(v)) => (k, v),
             _ => unreachable!(),
         }
     }
@@ -322,16 +322,16 @@ impl<K, V> Node<K, V> {
     /// We have somehow verified that this key-value pair will fit in this internal node,
     /// so insert under that assumption.
     fn insert_fit_as_leaf(&mut self, index: uint, key: K, val: V) {
-        self.keys.insert(index, key);
-        self.vals.insert(index, val);
+        self.keys.insert(index, key).debug_ok();
+        self.vals.insert(index, val).debug_ok();
     }
 
     /// We have somehow verified that this key-value pair will fit in this internal node,
     /// so insert under that assumption
     fn insert_fit_as_internal(&mut self, index: uint, key: K, val: V, right: Node<K, V>) {
-        self.keys.insert(index, key);
-        self.vals.insert(index, val);
-        self.edges.insert(index + 1, right);
+        self.keys.insert(index, key).debug_ok();
+        self.vals.insert(index, val).debug_ok();
+        self.edges.insert(index + 1, right).debug_ok();
     }
 
     /// Node is full, so split it into two nodes, and yield the middle-most key-value pair
@@ -393,11 +393,11 @@ impl<K, V> Node<K, V> {
         // Put them at the start of right
         {
             let right = self.unsafe_edge_mut(underflowed_child_index);
-            right.keys.insert(0, key);
-            right.vals.insert(0, val);
+            right.keys.insert(0, key).debug_ok();
+            right.vals.insert(0, val).debug_ok();
             match edge {
                 None => {}
-                Some(e) => right.edges.insert(0, e)
+                Some(e) => right.edges.insert(0, e).unwrap()
             }
         }
     }
@@ -409,7 +409,7 @@ impl<K, V> Node<K, V> {
         let (mut key, mut val, edge) = {
             let right = self.unsafe_edge_mut(underflowed_child_index + 1);
             match (right.keys.remove(0), right.vals.remove(0), right.edges.remove(0)) {
-                (Some(k), Some(v), e) => (k, v, e),
+                (Ok(k), Ok(v), e) => (k, v, e.ok()),
                 _ => unreachable!(),
             }
         };
@@ -438,7 +438,7 @@ impl<K, V> Node<K, V> {
             match (self.keys.remove(left_index),
                 self.vals.remove(left_index),
                 self.edges.remove(left_index + 1)) {
-                (Some(k), Some(v), Some(e)) => (k, v, e),
+                (Ok(k), Ok(v), Ok(e)) => (k, v, e),
                 _ => unreachable!(),
             }
         };

@@ -115,17 +115,17 @@ impl<'a, 'tcx, O:DataFlowOperator> pprust::PpAnn for DataFlowContext<'a, 'tcx, O
             assert!(self.bits_per_id > 0);
             let cfgidx = to_cfgidx_or_die(id, &self.nodeid_to_index);
             let (start, end) = self.compute_id_range(cfgidx);
-            let on_entry = self.on_entry.slice(start, end);
+            let on_entry = self.on_entry[start .. end];
             let entry_str = bits_to_string(on_entry);
 
-            let gens = self.gens.slice(start, end);
+            let gens = self.gens[start .. end];
             let gens_str = if gens.iter().any(|&u| u != 0) {
                 format!(" gen: {}", bits_to_string(gens))
             } else {
                 "".to_string()
             };
 
-            let kills = self.kills.slice(start, end);
+            let kills = self.kills[start .. end];
             let kills_str = if kills.iter().any(|&u| u != 0) {
                 format!(" kill: {}", bits_to_string(kills))
             } else {
@@ -253,9 +253,9 @@ impl<'a, 'tcx, O:DataFlowOperator> DataFlowContext<'a, 'tcx, O> {
         assert!(self.bits_per_id > 0);
 
         let (start, end) = self.compute_id_range(cfgidx);
-        let gens = self.gens.slice(start, end);
+        let gens = self.gens[start .. end];
         bitwise(bits, gens, &Union);
-        let kills = self.kills.slice(start, end);
+        let kills = self.kills[start .. end];
         bitwise(bits, kills, &Subtract);
 
         debug!("{:s} apply_gen_kill(cfgidx={}, bits={}) [after]",
@@ -304,7 +304,7 @@ impl<'a, 'tcx, O:DataFlowOperator> DataFlowContext<'a, 'tcx, O> {
         }
 
         let (start, end) = self.compute_id_range(cfgidx);
-        let on_entry = self.on_entry.slice(start, end);
+        let on_entry = self.on_entry[start .. end];
         let temp_bits;
         let slice = match e {
             Entry => on_entry,
@@ -335,7 +335,7 @@ impl<'a, 'tcx, O:DataFlowOperator> DataFlowContext<'a, 'tcx, O> {
 
         let cfgidx = to_cfgidx_or_die(id, &self.nodeid_to_index);
         let (start, end) = self.compute_id_range(cfgidx);
-        let gens = self.gens.slice(start, end);
+        let gens = self.gens[start .. end];
         debug!("{:s} each_gen_bit(id={:?}, gens={})",
                self.analysis_name, id, bits_to_string(gens));
         self.each_bit(gens, f)
@@ -393,7 +393,7 @@ impl<'a, 'tcx, O:DataFlowOperator> DataFlowContext<'a, 'tcx, O> {
         cfg.graph.each_edge(|_edge_index, edge| {
             let flow_exit = edge.source();
             let (start, end) = self.compute_id_range(flow_exit);
-            let mut orig_kills = self.kills.slice(start, end).to_vec();
+            let mut orig_kills = self.kills[start .. end].to_vec();
 
             let mut changed = false;
             for &node_id in edge.data.exiting_scopes.iter() {
@@ -401,7 +401,7 @@ impl<'a, 'tcx, O:DataFlowOperator> DataFlowContext<'a, 'tcx, O> {
                 match opt_cfg_idx {
                     Some(cfg_idx) => {
                         let (start, end) = self.compute_id_range(cfg_idx);
-                        let kills = self.kills.slice(start, end);
+                        let kills = self.kills[start .. end];
                         if bitwise(orig_kills.as_mut_slice(), kills, &Union) {
                             changed = true;
                         }
@@ -484,7 +484,7 @@ impl<'a, 'b, 'tcx, O:DataFlowOperator> PropagationContext<'a, 'b, 'tcx, O> {
             let (start, end) = self.dfcx.compute_id_range(node_index);
 
             // Initialize local bitvector with state on-entry.
-            in_out.copy_from(self.dfcx.on_entry.slice(start, end));
+            in_out.copy_from(self.dfcx.on_entry[start .. end]);
 
             // Compute state on-exit by applying transfer function to
             // state on-entry.
@@ -531,7 +531,7 @@ impl<'a, 'b, 'tcx, O:DataFlowOperator> PropagationContext<'a, 'b, 'tcx, O> {
         if changed {
             debug!("{:s} changed entry set for {:?} to {}",
                    self.dfcx.analysis_name, cfgidx,
-                   bits_to_string(self.dfcx.on_entry.slice(start, end)));
+                   bits_to_string(self.dfcx.on_entry[start .. end]));
             self.changed = true;
         }
     }

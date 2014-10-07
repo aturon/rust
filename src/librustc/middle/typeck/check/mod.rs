@@ -2510,7 +2510,7 @@ fn check_method_argument_types<'a>(fcx: &FnCtxt,
                 // HACK(eddyb) ignore self in the definition (see above).
                 check_argument_types(fcx,
                                      sp,
-                                     fty.sig.inputs.slice_from(1),
+                                     fty.sig.inputs[1..],
                                      callee_expr,
                                      args_no_rcvr,
                                      deref_args,

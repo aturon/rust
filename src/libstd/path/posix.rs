@@ -423,7 +423,7 @@ impl Path {
     /// Returns an iterator that yields each component of the path as Option<&str>.
     /// See components() for details.
     pub fn str_components<'a>(&'a self) -> StrComponents<'a> {
-        self.components().map(str::from_utf8)
+        self.components().map(|c| str::from_utf8(c).ok())
     }
 }
 

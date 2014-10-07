@@ -483,7 +483,7 @@ impl<'a> Formatter<'a> {
                 let char_len = s.char_len();
                 if char_len >= max {
                     let nchars = ::cmp::min(max, char_len);
-                    return self.buf.write(s.slice_chars(0, nchars).as_bytes());
+                    return self.buf.write(s.slice_chars(0, nchars).unwrap().as_bytes());
                 }
             }
             None => {}

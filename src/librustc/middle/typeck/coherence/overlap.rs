@@ -62,7 +62,7 @@ impl<'cx, 'tcx> OverlapChecker<'cx, 'tcx> {
                 continue;
             }
 
-            for &impl2_def_id in impls.slice_from(i+1).iter() {
+            for &impl2_def_id in impls[i+1..].iter() {
                 self.check_if_impls_overlap(trait_def_id,
                                             impl1_def_id,
                                             impl2_def_id);

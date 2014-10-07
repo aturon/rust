@@ -1528,8 +1528,8 @@ fn compile_unit_metadata(cx: &CrateContext) {
                             let prefix = &[dotdot[0], ::std::path::SEP_BYTE];
                             let mut path_bytes = Vec::from_slice(p.as_vec());
 
-                            if path_bytes.slice_to(2) != prefix &&
-                               path_bytes.slice_to(2) != dotdot {
+                            if path_bytes[..2] != prefix &&
+                               path_bytes[..2] != dotdot {
                                 path_bytes.insert(0, prefix[0]);
                                 path_bytes.insert(1, prefix[1]);
                             }
