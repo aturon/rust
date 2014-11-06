@@ -916,6 +916,22 @@ impl<'a, T> Default for &'a [T] {
     fn default() -> &'a [T] { &[] }
 }
 
+#[experiment = "trait is experimental"]
+impl<T> ops::Index<uint, T> for [T] {
+    fn index(&self, index: &uint) -> &T {
+        // For now, this uses the built-in compiler support for slices
+        &self[*index]
+    }
+}
+
+#[experiment = "trait is experimental"]
+impl<T> ops::IndexMut<uint, T> for [T] {
+    fn index_mut(&mut self, index: &uint) -> &mut T {
+        // For now, this uses the built-in compiler support for slices
+        &mut self[*index]
+    }
+}
+
 //
 // Iterators
 //
